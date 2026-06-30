@@ -175,6 +175,42 @@
         <div class="msg" id="event-msg"></div>
       </div>
 
+      <div class="card" id="giving-panel">
+        <h2>Giving</h2>
+        <div class="row">
+          <div>
+            <label for="donation-amount">Amount *</label>
+            <input id="donation-amount" type="number" min="0" step="0.01" placeholder="100.00" />
+          </div>
+          <div>
+            <label for="donation-date">Date *</label>
+            <input id="donation-date" type="date" />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label for="donation-type">Type *</label>
+            <input id="donation-type" placeholder="tithe" />
+          </div>
+          <div>
+            <label for="donation-member">Member</label>
+            <select id="donation-member"></select>
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label for="donation-household">Household (optional)</label>
+            <select id="donation-household"></select>
+          </div>
+        </div>
+        <div class="actions">
+          <button type="button" class="primary" id="save-donation">Record donation</button>
+        </div>
+        <div class="msg" id="giving-msg"></div>
+        <label>Recent donations</label>
+        <div id="donation-list" class="checklist"></div>
+      </div>
+
       <div class="card">
         <h2>Directory</h2>
         <div class="filters">
@@ -593,6 +629,85 @@
       }
     }
 
+    // --- Giving (Story 3.1) ---
+    function setGivingMsg(text, ok) {
+      const el = $("giving-msg");
+      el.textContent = text || "";
+      el.className = "msg" + (text ? (ok ? " ok" : " error") : "");
+    }
+
+    function memberLabel(id) {
+      const m = allMembers.find((x) => x.id === id);
+      return m ? `${m.first_name} ${m.last_name}` : `member #${id}`;
+    }
+
+    async function loadGiving() {
+      allMembers = await api("/members");
+      fillSelect($("donation-member"), allMembers.map((m) => ({
+        id: m.id,
+        name: `${m.first_name} ${m.last_name}`,
+      })));
+      fillSelect($("donation-household"), households);
+      await loadDonations();
+    }
+
+    async function loadDonations() {
+      const box = $("donation-list");
+      box.innerHTML = "";
+      try {
+        const donations = await api("/donations");
+        if (!donations.length) {
+          box.innerHTML = '<div class="hint">No donations recorded yet.</div>';
+          return;
+        }
+        for (const d of donations.slice().reverse()) {
+          const who = d.member_id
+            ? memberLabel(d.member_id)
+            : `household: ${nameOf(households, d.household_id)}`;
+          const line = document.createElement("div");
+          line.textContent = `${d.date} · ${d.amount.toFixed(2)} · ${d.donation_type} · ${who}`;
+          box.appendChild(line);
+        }
+      } catch (err) {
+        box.innerHTML = `<div class="hint">${err.message}</div>`;
+      }
+    }
+
+    async function saveDonation() {
+      const amount = Number($("donation-amount").value);
+      const date = $("donation-date").value;
+      const donationType = $("donation-type").value.trim();
+      const memberId = $("donation-member").value;
+      const householdId = $("donation-household").value;
+      if (!amount || amount <= 0 || !date || !donationType) {
+        setGivingMsg("Amount (positive), date, and type are required.", false);
+        return;
+      }
+      if (!memberId && !householdId) {
+        setGivingMsg("Select a member or a household.", false);
+        return;
+      }
+      try {
+        await api("/donations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            amount,
+            date,
+            donation_type: donationType,
+            member_id: memberId ? Number(memberId) : null,
+            household_id: householdId ? Number(householdId) : null,
+          }),
+        });
+        $("donation-amount").value = "";
+        $("donation-type").value = "";
+        await loadDonations();
+        setGivingMsg("Donation recorded.", true);
+      } catch (err) {
+        setGivingMsg(err.message, false);
+      }
+    }
+
     function showProfile(m) {
       lastProfile = m;
       $("profile-body").innerHTML =
@@ -722,6 +837,7 @@
     $("rsvp-event").addEventListener("change", () =>
       loadRsvps().catch((e) => setEventMsg(e.message, false))
     );
+    $("save-donation").addEventListener("click", saveDonation);
 
     // --- Directory search & filtering ---
     let searchTimer = null;
@@ -752,6 +868,7 @@
         await loadDirectory();
         await loadAttendance();
         await loadEvents();
+        await loadGiving();
       } catch (err) {
         $("dir-msg").textContent = err.message;
         $("dir-msg").className = "msg error";

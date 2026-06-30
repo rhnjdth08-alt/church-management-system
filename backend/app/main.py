@@ -12,6 +12,7 @@ from .database import create_db_and_tables, engine, get_session
 from .models import (
     AttendanceRecord,
     Division,
+    Donation,
     Event,
     EventRSVP,
     Household,
@@ -27,6 +28,8 @@ from .schemas import (
     DivisionAttendanceCount,
     DivisionAttendanceSummaryEntry,
     DivisionCreate,
+    DonationCreate,
+    DonationRead,
     EventCreate,
     EventRead,
     EventRSVPSummary,
@@ -593,6 +596,57 @@ def event_summary(*, session: Session = Depends(get_session), event_id: int):
     if not session.get(Event, event_id):
         raise HTTPException(status_code=404, detail="Event not found.")
     return _event_summary(session, event_id)
+
+
+# --- Giving (Epic 3, Story 3.1) --------------------------------------------
+
+
+@app.post("/donations", response_model=DonationRead)
+def create_donation(*, session: Session = Depends(get_session), donation: DonationCreate):
+    if donation.amount <= 0:
+        raise HTTPException(status_code=400, detail="Donation amount must be positive.")
+    if not donation.donation_type.strip():
+        raise HTTPException(status_code=400, detail="Donation type is required.")
+    if donation.member_id is None and donation.household_id is None:
+        raise HTTPException(
+            status_code=400, detail="A donation must reference a member or household."
+        )
+    if donation.member_id is not None and not session.get(Member, donation.member_id):
+        raise HTTPException(status_code=400, detail="Member not found.")
+    if donation.household_id is not None and not session.get(
+        Household, donation.household_id
+    ):
+        raise HTTPException(status_code=400, detail="Household not found.")
+    db_donation = Donation.model_validate(donation)
+    session.add(db_donation)
+    session.commit()
+    session.refresh(db_donation)
+    return db_donation
+
+
+@app.get("/donations", response_model=list[DonationRead])
+def list_donations(*, session: Session = Depends(get_session)):
+    return session.exec(select(Donation)).all()
+
+
+@app.get("/members/{member_id}/donations", response_model=list[DonationRead])
+def member_donations(*, session: Session = Depends(get_session), member_id: int):
+    """A member's giving history (AC #3)."""
+    if not session.get(Member, member_id):
+        raise HTTPException(status_code=404, detail="Member not found.")
+    return session.exec(
+        select(Donation).where(Donation.member_id == member_id)
+    ).all()
+
+
+@app.get("/households/{household_id}/donations", response_model=list[DonationRead])
+def household_donations(*, session: Session = Depends(get_session), household_id: int):
+    """A household's giving history (AC #3)."""
+    if not session.get(Household, household_id):
+        raise HTTPException(status_code=404, detail="Household not found.")
+    return session.exec(
+        select(Donation).where(Donation.household_id == household_id)
+    ).all()
 
 
 @app.get("/", include_in_schema=False)

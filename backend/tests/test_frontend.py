@@ -60,3 +60,11 @@ def test_events_ui_controls_present():
     assert 'id="events-panel"' in body
     assert 'id="event-name"' in body
     assert 'id="event-date"' in body
+
+
+def test_giving_ui_controls_present():
+    """The UI must let an admin record donations (Story 3.1)."""
+    body = client.get("/").text
+    assert 'id="giving-panel"' in body
+    assert 'id="donation-amount"' in body
+    assert 'id="donation-date"' in body

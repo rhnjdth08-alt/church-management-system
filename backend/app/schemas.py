@@ -144,3 +144,25 @@ class EventRSVPSummary(SQLModel):
     yes_count: int
     no_count: int
     total: int
+
+
+# --- Giving (Story 3.1) ----------------------------------------------------
+
+
+class DonationCreate(SQLModel):
+    amount: float
+    date: date
+    donation_type: str
+    member_id: Optional[int] = None
+    household_id: Optional[int] = None
+    campaign_id: Optional[int] = None
+
+
+class DonationRead(SQLModel):
+    id: int
+    amount: float
+    date: date
+    donation_type: str
+    member_id: Optional[int] = None
+    household_id: Optional[int] = None
+    campaign_id: Optional[int] = None

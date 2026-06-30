@@ -70,7 +70,7 @@ development_status:
     story: 3
     file: _bmad-output/implementation-artifacts/2-3-manage-event-rsvps.md
   3-1-record-donations:
-    status: ready-for-dev
+    status: review
     title: Record donations
     epic: 3
     story: 1

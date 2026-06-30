@@ -203,3 +203,23 @@ class EventRSVP(SQLModel, table=True):
     response: str
 
     event: Optional[Event] = Relationship(back_populates="rsvps")
+
+
+# --- Giving (Epic 3, Story 3.1) --------------------------------------------
+
+
+class Donation(SQLModel, table=True):
+    """A recorded gift from a member and/or household (Story 3.1).
+
+    ``campaign_id`` is a forward-compatibility hook for Story 3.2 (fundraising
+    campaigns): a plain nullable column, not a FK yet, so donations can later be
+    attributed to a campaign without a schema migration.
+    """
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    amount: float
+    date: date
+    donation_type: str
+    member_id: Optional[int] = Field(default=None, foreign_key="member.id")
+    household_id: Optional[int] = Field(default=None, foreign_key="household.id")
+    campaign_id: Optional[int] = Field(default=None)
