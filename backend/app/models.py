@@ -223,3 +223,29 @@ class Donation(SQLModel, table=True):
     member_id: Optional[int] = Field(default=None, foreign_key="member.id")
     household_id: Optional[int] = Field(default=None, foreign_key="household.id")
     campaign_id: Optional[int] = Field(default=None)
+
+
+# --- Fundraising (Epic 3, Story 3.2) ---------------------------------------
+
+
+class FundraisingCampaign(SQLModel, table=True):
+    """A fundraising campaign with a target. Contributions are Donations linked
+    via ``Donation.campaign_id``; commitments are ``Pledge`` rows."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str
+    target_amount: float
+    description: Optional[str] = None
+    pledges: List["Pledge"] = Relationship(back_populates="campaign")
+
+
+class Pledge(SQLModel, table=True):
+    """A commitment to give toward a campaign (Story 3.2, AC #2)."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    campaign_id: int = Field(foreign_key="fundraisingcampaign.id")
+    amount: float
+    member_id: Optional[int] = Field(default=None, foreign_key="member.id")
+    household_id: Optional[int] = Field(default=None, foreign_key="household.id")
+
+    campaign: Optional[FundraisingCampaign] = Relationship(back_populates="pledges")

@@ -68,3 +68,11 @@ def test_giving_ui_controls_present():
     assert 'id="giving-panel"' in body
     assert 'id="donation-amount"' in body
     assert 'id="donation-date"' in body
+
+
+def test_fundraising_ui_controls_present():
+    """The UI must let a leader track fundraising campaigns (Story 3.2)."""
+    body = client.get("/").text
+    assert 'id="fundraising-panel"' in body
+    assert 'id="campaign-name"' in body
+    assert 'id="campaign-target"' in body

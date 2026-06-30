@@ -166,3 +166,45 @@ class DonationRead(SQLModel):
     member_id: Optional[int] = None
     household_id: Optional[int] = None
     campaign_id: Optional[int] = None
+
+
+# --- Fundraising (Story 3.2) -----------------------------------------------
+
+
+class CampaignCreate(SQLModel):
+    name: str
+    target_amount: float
+    description: Optional[str] = None
+
+
+class CampaignRead(SQLModel):
+    id: int
+    name: str
+    target_amount: float
+    description: Optional[str] = None
+
+
+class PledgeCreate(SQLModel):
+    amount: float
+    member_id: Optional[int] = None
+    household_id: Optional[int] = None
+
+
+class PledgeRead(SQLModel):
+    id: int
+    campaign_id: int
+    amount: float
+    member_id: Optional[int] = None
+    household_id: Optional[int] = None
+
+
+class CampaignProgress(SQLModel):
+    """Progress toward a campaign target (Story 3.2, AC #4)."""
+
+    campaign_id: int
+    name: str
+    target: float
+    total_pledged: float
+    total_raised: float
+    remaining: float
+    percent_raised: float

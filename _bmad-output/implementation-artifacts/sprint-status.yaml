@@ -76,7 +76,7 @@ development_status:
     story: 1
     file: _bmad-output/implementation-artifacts/3-1-record-donations.md
   3-2-track-building-fundraising-campaigns:
-    status: ready-for-dev
+    status: review
     title: Track building fundraising campaigns
     epic: 3
     story: 2

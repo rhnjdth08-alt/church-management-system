@@ -211,6 +211,41 @@
         <div id="donation-list" class="checklist"></div>
       </div>
 
+      <div class="card" id="fundraising-panel">
+        <h2>Fundraising</h2>
+        <div class="row">
+          <div>
+            <label for="campaign-name">Campaign *</label>
+            <input id="campaign-name" placeholder="Building Fund" />
+          </div>
+          <div>
+            <label for="campaign-target">Target *</label>
+            <input id="campaign-target" type="number" min="0" step="0.01" placeholder="10000" />
+          </div>
+        </div>
+        <div class="actions">
+          <button type="button" class="ghost" id="create-campaign">Create campaign</button>
+        </div>
+
+        <label for="pledge-campaign">Campaign</label>
+        <select id="pledge-campaign"></select>
+        <div id="campaign-progress" class="hint"></div>
+        <div class="row">
+          <div>
+            <label for="pledge-amount">Pledge amount</label>
+            <input id="pledge-amount" type="number" min="0" step="0.01" placeholder="500" />
+          </div>
+          <div>
+            <label for="pledge-member">Pledged by (member)</label>
+            <select id="pledge-member"></select>
+          </div>
+        </div>
+        <div class="actions">
+          <button type="button" class="primary" id="save-pledge">Record pledge</button>
+        </div>
+        <div class="msg" id="fundraising-msg"></div>
+      </div>
+
       <div class="card">
         <h2>Directory</h2>
         <div class="filters">
@@ -708,6 +743,114 @@
       }
     }
 
+    // --- Fundraising (Story 3.2) ---
+    let campaigns = [];
+    function setFundMsg(text, ok) {
+      const el = $("fundraising-msg");
+      el.textContent = text || "";
+      el.className = "msg" + (text ? (ok ? " ok" : " error") : "");
+    }
+
+    async function loadFundraising() {
+      [campaigns, allMembers] = await Promise.all([
+        api("/campaigns"),
+        api("/members"),
+      ]);
+      const sel = $("pledge-campaign");
+      const current = sel.value;
+      sel.innerHTML = "";
+      if (!campaigns.length) {
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = "— create a campaign first —";
+        sel.appendChild(opt);
+      }
+      for (const c of campaigns) {
+        const opt = document.createElement("option");
+        opt.value = c.id;
+        opt.textContent = `${c.name} (target ${c.target_amount.toFixed(2)})`;
+        sel.appendChild(opt);
+      }
+      sel.value = current;
+      if (sel.selectedIndex < 0 && sel.options.length) sel.selectedIndex = 0;
+      fillSelect($("pledge-member"), allMembers.map((m) => ({
+        id: m.id,
+        name: `${m.first_name} ${m.last_name}`,
+      })));
+      await loadProgress();
+    }
+
+    async function loadProgress() {
+      const el = $("campaign-progress");
+      const id = $("pledge-campaign").value;
+      if (!id) {
+        el.textContent = "";
+        return;
+      }
+      try {
+        const p = await api(`/campaigns/${id}/progress`);
+        el.textContent =
+          `Raised ${p.total_raised.toFixed(2)} of ${p.target.toFixed(2)} ` +
+          `(${p.percent_raised.toFixed(1)}%) · pledged ${p.total_pledged.toFixed(2)} · ` +
+          `remaining ${p.remaining.toFixed(2)}`;
+      } catch (err) {
+        el.textContent = err.message;
+      }
+    }
+
+    async function createCampaign() {
+      const name = $("campaign-name").value.trim();
+      const target = Number($("campaign-target").value);
+      if (!name || !target || target <= 0) {
+        setFundMsg("Campaign name and a positive target are required.", false);
+        return;
+      }
+      try {
+        const c = await api("/campaigns", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, target_amount: target }),
+        });
+        $("campaign-name").value = "";
+        $("campaign-target").value = "";
+        await loadFundraising();
+        $("pledge-campaign").value = c.id;
+        await loadProgress();
+        setFundMsg(`Campaign "${c.name}" created.`, true);
+      } catch (err) {
+        setFundMsg(err.message, false);
+      }
+    }
+
+    async function savePledge() {
+      const id = $("pledge-campaign").value;
+      const amount = Number($("pledge-amount").value);
+      const memberId = $("pledge-member").value;
+      if (!id) {
+        setFundMsg("Select or create a campaign first.", false);
+        return;
+      }
+      if (!amount || amount <= 0) {
+        setFundMsg("Pledge amount must be positive.", false);
+        return;
+      }
+      try {
+        await api(`/campaigns/${id}/pledges`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            amount,
+            member_id: memberId ? Number(memberId) : null,
+          }),
+        });
+        $("pledge-amount").value = "";
+        await loadProgress();
+        setFundMsg("Pledge recorded.", true);
+      } catch (err) {
+        setFundMsg(err.message, false);
+      }
+    }
+
     function showProfile(m) {
       lastProfile = m;
       $("profile-body").innerHTML =
@@ -838,6 +981,11 @@
       loadRsvps().catch((e) => setEventMsg(e.message, false))
     );
     $("save-donation").addEventListener("click", saveDonation);
+    $("create-campaign").addEventListener("click", createCampaign);
+    $("save-pledge").addEventListener("click", savePledge);
+    $("pledge-campaign").addEventListener("change", () =>
+      loadProgress().catch((e) => setFundMsg(e.message, false))
+    );
 
     // --- Directory search & filtering ---
     let searchTimer = null;
@@ -869,6 +1017,7 @@
         await loadAttendance();
         await loadEvents();
         await loadGiving();
+        await loadFundraising();
       } catch (err) {
         $("dir-msg").textContent = err.message;
         $("dir-msg").className = "msg error";

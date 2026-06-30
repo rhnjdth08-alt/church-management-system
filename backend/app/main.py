@@ -15,16 +15,21 @@ from .models import (
     Donation,
     Event,
     EventRSVP,
+    FundraisingCampaign,
     Household,
     Member,
     MemberDivisionLink,
     MemberTagLink,
+    Pledge,
     Service,
     Tag,
 )
 from .schemas import (
     AttendanceCreate,
     AttendanceHistoryEntry,
+    CampaignCreate,
+    CampaignProgress,
+    CampaignRead,
     DivisionAttendanceCount,
     DivisionAttendanceSummaryEntry,
     DivisionCreate,
@@ -37,6 +42,8 @@ from .schemas import (
     MemberCreate,
     MemberRead,
     MemberUpdate,
+    PledgeCreate,
+    PledgeRead,
     RSVPCreate,
     RSVPRead,
     ServiceCreate,
@@ -617,6 +624,10 @@ def create_donation(*, session: Session = Depends(get_session), donation: Donati
         Household, donation.household_id
     ):
         raise HTTPException(status_code=400, detail="Household not found.")
+    if donation.campaign_id is not None and not session.get(
+        FundraisingCampaign, donation.campaign_id
+    ):
+        raise HTTPException(status_code=400, detail="Campaign not found.")
     db_donation = Donation.model_validate(donation)
     session.add(db_donation)
     session.commit()
@@ -647,6 +658,88 @@ def household_donations(*, session: Session = Depends(get_session), household_id
     return session.exec(
         select(Donation).where(Donation.household_id == household_id)
     ).all()
+
+
+# --- Fundraising (Epic 3, Story 3.2) ---------------------------------------
+
+
+@app.post("/campaigns", response_model=CampaignRead)
+def create_campaign(*, session: Session = Depends(get_session), campaign: CampaignCreate):
+    if not campaign.name.strip():
+        raise HTTPException(status_code=400, detail="Campaign name is required.")
+    if campaign.target_amount <= 0:
+        raise HTTPException(status_code=400, detail="Target amount must be positive.")
+    db_campaign = FundraisingCampaign.model_validate(campaign)
+    session.add(db_campaign)
+    session.commit()
+    session.refresh(db_campaign)
+    return db_campaign
+
+
+@app.get("/campaigns", response_model=list[CampaignRead])
+def list_campaigns(*, session: Session = Depends(get_session)):
+    return session.exec(select(FundraisingCampaign)).all()
+
+
+@app.post("/campaigns/{campaign_id}/pledges", response_model=PledgeRead)
+def create_pledge(
+    *, session: Session = Depends(get_session), campaign_id: int, pledge: PledgeCreate
+):
+    if not session.get(FundraisingCampaign, campaign_id):
+        raise HTTPException(status_code=404, detail="Campaign not found.")
+    if pledge.amount <= 0:
+        raise HTTPException(status_code=400, detail="Pledge amount must be positive.")
+    if pledge.member_id is not None and not session.get(Member, pledge.member_id):
+        raise HTTPException(status_code=400, detail="Member not found.")
+    if pledge.household_id is not None and not session.get(Household, pledge.household_id):
+        raise HTTPException(status_code=400, detail="Household not found.")
+    db_pledge = Pledge(
+        campaign_id=campaign_id,
+        amount=pledge.amount,
+        member_id=pledge.member_id,
+        household_id=pledge.household_id,
+    )
+    session.add(db_pledge)
+    session.commit()
+    session.refresh(db_pledge)
+    return db_pledge
+
+
+@app.get("/campaigns/{campaign_id}/pledges", response_model=list[PledgeRead])
+def list_pledges(*, session: Session = Depends(get_session), campaign_id: int):
+    if not session.get(FundraisingCampaign, campaign_id):
+        raise HTTPException(status_code=404, detail="Campaign not found.")
+    return session.exec(
+        select(Pledge).where(Pledge.campaign_id == campaign_id)
+    ).all()
+
+
+@app.get("/campaigns/{campaign_id}/progress", response_model=CampaignProgress)
+def campaign_progress(*, session: Session = Depends(get_session), campaign_id: int):
+    """Progress toward a campaign's target (AC #4)."""
+    campaign = session.get(FundraisingCampaign, campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found.")
+    pledges = session.exec(
+        select(Pledge).where(Pledge.campaign_id == campaign_id)
+    ).all()
+    contributions = session.exec(
+        select(Donation).where(Donation.campaign_id == campaign_id)
+    ).all()
+    total_pledged = sum(p.amount for p in pledges)
+    total_raised = sum(d.amount for d in contributions)
+    remaining = max(campaign.target_amount - total_raised, 0.0)
+    # target_amount is validated > 0 at creation, so this never divides by zero.
+    percent_raised = total_raised / campaign.target_amount * 100
+    return CampaignProgress(
+        campaign_id=campaign_id,
+        name=campaign.name,
+        target=campaign.target_amount,
+        total_pledged=total_pledged,
+        total_raised=total_raised,
+        remaining=remaining,
+        percent_raised=percent_raised,
+    )
 
 
 @app.get("/", include_in_schema=False)
