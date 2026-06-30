@@ -1,9 +1,11 @@
+import csv
+import io
 import re
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Response
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlmodel import Session, func, select
@@ -951,6 +953,62 @@ def dashboard(*, session: Session = Depends(get_session)):
         giving_by_period=_giving_by_period(session),
         attendance_by_service=attendance_by_service,
         campaigns=[_campaign_progress(session, c) for c in campaigns],
+    )
+
+
+# --- Exports (Epic 4, Story 4.3) -------------------------------------------
+
+
+def _csv_response(filename: str, header: list[str], rows: list[list]) -> Response:
+    """Build a downloadable CSV response from a header + data rows (stdlib only)."""
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(header)
+    writer.writerows(rows)
+    return Response(
+        content=buffer.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@app.get("/exports/attendance.csv")
+def export_attendance(*, session: Session = Depends(get_session)):
+    """Attendance-by-service summary as CSV (AC #1, #2)."""
+    rows = []
+    for s in session.exec(select(Service)).all():
+        rows.append([s.id, s.name, s.date.isoformat(), len(_present_members(session, s.id))])
+    return _csv_response("attendance.csv", ["service_id", "name", "date", "present"], rows)
+
+
+@app.get("/exports/giving.csv")
+def export_giving(*, session: Session = Depends(get_session)):
+    """Giving-by-month summary as CSV (AC #1, #2)."""
+    rows = [[p.period, p.total, p.count] for p in _giving_by_period(session)]
+    return _csv_response("giving.csv", ["period", "total", "count"], rows)
+
+
+@app.get("/exports/fundraising.csv")
+def export_fundraising(*, session: Session = Depends(get_session)):
+    """Campaign-progress summary as CSV (AC #1, #2)."""
+    rows = []
+    for c in session.exec(select(FundraisingCampaign)).all():
+        p = _campaign_progress(session, c)
+        rows.append(
+            [
+                p.campaign_id,
+                p.name,
+                p.target,
+                p.total_pledged,
+                p.total_raised,
+                p.remaining,
+                p.percent_raised,
+            ]
+        )
+    return _csv_response(
+        "fundraising.csv",
+        ["campaign_id", "name", "target", "total_pledged", "total_raised", "remaining", "percent_raised"],
+        rows,
     )
 
 

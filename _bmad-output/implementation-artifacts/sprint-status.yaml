@@ -100,7 +100,7 @@ development_status:
     story: 2
     file: _bmad-output/implementation-artifacts/4-2-provide-basic-dashboards.md
   4-3-export-summary-reports:
-    status: ready-for-dev
+    status: review
     title: Export summary reports
     epic: 4
     story: 3

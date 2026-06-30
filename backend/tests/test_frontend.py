@@ -96,3 +96,12 @@ def test_dashboard_ui_present():
     """The UI must surface a dashboard (Story 4.2)."""
     body = client.get("/").text
     assert 'id="dashboard-panel"' in body
+
+
+def test_exports_ui_present():
+    """The UI must offer CSV export links (Story 4.3)."""
+    body = client.get("/").text
+    assert 'id="exports"' in body
+    assert "/exports/attendance.csv" in body
+    assert "/exports/giving.csv" in body
+    assert "/exports/fundraising.csv" in body
