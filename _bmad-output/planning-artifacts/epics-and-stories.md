@@ -48,7 +48,7 @@ Acceptance Criteria:
 - Division attendance summaries are visible by date and class.
 - Leaders can compare attendance across divisions.
 
-### Story 2.2: Manage event RSVPs
+### Story 2.3: Manage event RSVPs
 As an event coordinator, I want to track RSVPs so that I can plan events more effectively.
 
 Acceptance Criteria:

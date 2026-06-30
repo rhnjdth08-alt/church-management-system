@@ -1,0 +1,1415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Church Management System — Members</title>
+  <style>
+    :root { --accent: #2c5f8a; --border: #d7dde3; --bg: #f5f7fa; }
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, Arial, sans-serif; margin: 0; background: var(--bg); color: #1f2933; }
+    header { background: var(--accent); color: #fff; padding: 16px 24px; }
+    header h1 { margin: 0; font-size: 20px; }
+    main { display: grid; grid-template-columns: 380px 1fr; gap: 24px; padding: 24px; align-items: start; }
+    .card { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 18px; }
+    .card h2 { margin-top: 0; font-size: 16px; }
+    label { display: block; font-size: 13px; margin: 10px 0 4px; font-weight: 600; }
+    input, select { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; }
+    .row { display: flex; gap: 10px; }
+    .row > div { flex: 1; }
+    button { cursor: pointer; border: none; border-radius: 6px; padding: 9px 14px; font-size: 14px; }
+    .primary { background: var(--accent); color: #fff; }
+    .ghost { background: #eef1f5; color: #1f2933; }
+    .ghost.danger { background: #fbe5e5; color: #b00020; padding: 2px 8px; line-height: 1; }
+    .ghost.danger:hover { background: #f5cccc; }
+    .manage-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 0; }
+    .actions { margin-top: 14px; display: flex; gap: 10px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--border); }
+    tr.clickable:hover { background: #f0f4f8; cursor: pointer; }
+    .hint { font-size: 11px; color: #52606d; margin-top: 4px; }
+    select[multiple] { height: auto; padding: 4px; }
+    .filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+    .filters input, .filters select { width: auto; flex: 1; min-width: 120px; }
+    .filters button { flex: 0 0 auto; }
+    .checklist { max-height: 180px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; padding: 8px; }
+    .checklist label { display: flex; align-items: center; gap: 8px; font-weight: 400; margin: 2px 0; }
+    .checklist input[type="checkbox"] { width: auto; }
+    .msg { margin-top: 10px; font-size: 13px; min-height: 18px; }
+    .msg.error { color: #b00020; }
+    .msg.ok { color: #1a7f37; }
+    .inline-add { display: flex; gap: 6px; margin-top: 6px; }
+    .inline-add input { flex: 1; }
+    .inline-add button { white-space: nowrap; }
+    fieldset { border: 1px dashed var(--border); border-radius: 6px; margin-top: 14px; padding: 10px 12px; }
+    legend { font-size: 12px; color: #52606d; padding: 0 6px; }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; background: #e3f0e6; color: #1a7f37; }
+    .pill.inactive { background: #fbe5e5; color: #b00020; }
+    #profile dl { display: grid; grid-template-columns: 120px 1fr; gap: 6px 12px; font-size: 14px; }
+    #profile dt { font-weight: 600; color: #52606d; }
+  </style>
+</head>
+<body>
+  <header><h1>Church Management System — Member Directory</h1></header>
+  <main>
+    <section class="card">
+      <h2 id="form-title">Add Member</h2>
+      <form id="member-form">
+        <input type="hidden" id="member-id" />
+        <div class="row">
+          <div>
+            <label for="first_name">First name *</label>
+            <input id="first_name" required />
+          </div>
+          <div>
+            <label for="last_name">Last name *</label>
+            <input id="last_name" required />
+          </div>
+        </div>
+        <label for="email">Email</label>
+        <input id="email" type="email" placeholder="name@example.com" />
+        <label for="phone">Phone</label>
+        <input id="phone" placeholder="555-123-4567" />
+        <label for="status">Status</label>
+        <select id="status">
+          <option value="active">active</option>
+          <option value="inactive">inactive</option>
+        </select>
+
+        <label for="household_name">Household</label>
+        <input id="household_name" list="household-options" placeholder="Type a household name (new ones are created automatically)" autocomplete="off" />
+        <datalist id="household-options"></datalist>
+        <div class="hint">Start typing to reuse an existing household, or enter a new name to create one.</div>
+
+        <label for="division_id">Primary division *</label>
+        <select id="division_id" required></select>
+        <div class="inline-add">
+          <input id="new-division" placeholder="New division name" />
+          <button type="button" class="ghost" id="add-division">+ Add</button>
+        </div>
+
+        <label for="division_ids">Divisions (select one or more)</label>
+        <select id="division_ids" multiple size="4"></select>
+        <div class="hint">Hold Ctrl (or Cmd) to select multiple. The primary division is always included.</div>
+
+        <label for="tags_text">Ministry tags (optional)</label>
+        <input id="tags_text" list="tag-options" placeholder="e.g. Choir, Ushers, Youth" autocomplete="off" />
+        <datalist id="tag-options"></datalist>
+        <div class="hint">Separate multiple tags with commas. New tags are created automatically.</div>
+
+        <div class="actions">
+          <button type="submit" class="primary" id="save-btn">Save Member</button>
+          <button type="button" class="ghost" id="reset-btn">Clear</button>
+        </div>
+        <div class="msg" id="form-msg"></div>
+      </form>
+    </section>
+
+    <section style="display:grid; gap:24px;">
+      <div class="card" id="profile" hidden>
+        <h2>Member Profile</h2>
+        <dl id="profile-body"></dl>
+        <div class="actions"><button type="button" class="ghost" id="edit-btn">Edit this member</button></div>
+      </div>
+
+      <div class="card" id="attendance-panel">
+        <h2>Record Attendance</h2>
+        <div class="row">
+          <div>
+            <label for="service-name">Service / event *</label>
+            <input id="service-name" placeholder="Sunday Service" />
+          </div>
+          <div>
+            <label for="service-date">Date *</label>
+            <input id="service-date" type="date" />
+          </div>
+        </div>
+        <div class="actions">
+          <button type="button" class="ghost" id="create-service">Create service</button>
+        </div>
+
+        <label for="attendance-service">Service to record against</label>
+        <select id="attendance-service"></select>
+        <label>Mark present</label>
+        <div id="attendance-members" class="checklist"></div>
+        <div class="actions">
+          <button type="button" class="primary" id="save-attendance">Save attendance</button>
+        </div>
+        <div class="msg" id="attendance-msg"></div>
+        <label>Attendance by division</label>
+        <div id="attendance-by-division" class="checklist"></div>
+      </div>
+
+      <div class="card" id="events-panel">
+        <h2>Events &amp; RSVPs</h2>
+        <div class="row">
+          <div>
+            <label for="event-name">Event *</label>
+            <input id="event-name" placeholder="Church Picnic" />
+          </div>
+          <div>
+            <label for="event-date">Date *</label>
+            <input id="event-date" type="date" />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label for="event-location">Location</label>
+            <input id="event-location" placeholder="City Park" />
+          </div>
+          <div>
+            <label for="event-description">Description</label>
+            <input id="event-description" placeholder="Annual gathering" />
+          </div>
+        </div>
+        <div class="actions">
+          <button type="button" class="ghost" id="create-event">Create event</button>
+        </div>
+
+        <label for="rsvp-event">Event to RSVP for</label>
+        <select id="rsvp-event"></select>
+        <div id="rsvp-summary" class="hint"></div>
+        <label>RSVP members</label>
+        <div id="rsvp-members" class="checklist"></div>
+        <div class="msg" id="event-msg"></div>
+      </div>
+
+      <div class="card" id="giving-panel">
+        <h2>Giving</h2>
+        <div class="row">
+          <div>
+            <label for="donation-amount">Amount *</label>
+            <input id="donation-amount" type="number" min="0" step="0.01" placeholder="100.00" />
+          </div>
+          <div>
+            <label for="donation-date">Date *</label>
+            <input id="donation-date" type="date" />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label for="donation-type">Type *</label>
+            <input id="donation-type" placeholder="tithe" />
+          </div>
+          <div>
+            <label for="donation-member">Member</label>
+            <select id="donation-member"></select>
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label for="donation-household">Household (optional)</label>
+            <select id="donation-household"></select>
+          </div>
+        </div>
+        <div class="actions">
+          <button type="button" class="primary" id="save-donation">Record donation</button>
+        </div>
+        <div class="msg" id="giving-msg"></div>
+        <label>Recent donations</label>
+        <div id="donation-list" class="checklist"></div>
+      </div>
+
+      <div class="card" id="fundraising-panel">
+        <h2>Fundraising</h2>
+        <div class="row">
+          <div>
+            <label for="campaign-name">Campaign *</label>
+            <input id="campaign-name" placeholder="Building Fund" />
+          </div>
+          <div>
+            <label for="campaign-target">Target *</label>
+            <input id="campaign-target" type="number" min="0" step="0.01" placeholder="10000" />
+          </div>
+        </div>
+        <div class="actions">
+          <button type="button" class="ghost" id="create-campaign">Create campaign</button>
+        </div>
+
+        <label for="pledge-campaign">Campaign</label>
+        <select id="pledge-campaign"></select>
+        <div id="campaign-progress" class="hint"></div>
+        <div class="row">
+          <div>
+            <label for="pledge-amount">Pledge amount</label>
+            <input id="pledge-amount" type="number" min="0" step="0.01" placeholder="500" />
+          </div>
+          <div>
+            <label for="pledge-member">Pledged by (member)</label>
+            <select id="pledge-member"></select>
+          </div>
+        </div>
+        <div class="actions">
+          <button type="button" class="primary" id="save-pledge">Record pledge</button>
+        </div>
+        <div class="msg" id="fundraising-msg"></div>
+      </div>
+
+      <div class="card" id="summary-panel">
+        <h2>Giving Summary</h2>
+        <div class="actions">
+          <button type="button" class="ghost" id="refresh-summary">Refresh summary</button>
+        </div>
+        <div id="summary-total" class="hint"></div>
+        <label>By month</label>
+        <div id="summary-period" class="checklist"></div>
+        <label>Top donors</label>
+        <div id="summary-donors" class="checklist"></div>
+        <label>Campaign progress</label>
+        <div id="summary-campaigns" class="checklist"></div>
+        <div class="msg" id="summary-msg"></div>
+      </div>
+
+      <div class="card" id="announcements-panel">
+        <h2>Announcements</h2>
+        <label for="announcement-subject">Subject *</label>
+        <input id="announcement-subject" placeholder="Service time change" />
+        <label for="announcement-body">Message *</label>
+        <input id="announcement-body" placeholder="This Sunday we meet at 10am." />
+        <div class="row">
+          <div>
+            <label for="announcement-division">Division</label>
+            <select id="announcement-division"></select>
+          </div>
+          <div>
+            <label for="announcement-tag">Tag</label>
+            <select id="announcement-tag"></select>
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label for="announcement-household">Household</label>
+            <select id="announcement-household"></select>
+          </div>
+        </div>
+        <div id="announcement-preview" class="hint"></div>
+        <div class="actions">
+          <button type="button" class="primary" id="send-announcement">Send announcement</button>
+        </div>
+        <div class="msg" id="announcement-msg"></div>
+        <label>Sent log</label>
+        <div id="announcement-log" class="checklist"></div>
+      </div>
+
+      <div class="card" id="dashboard-panel">
+        <h2>Dashboard</h2>
+        <div class="actions">
+          <button type="button" class="ghost" id="refresh-dashboard">Refresh dashboard</button>
+        </div>
+        <div id="dashboard-metrics" class="checklist"></div>
+        <label>Attendance by service</label>
+        <div id="dashboard-attendance" class="checklist"></div>
+        <label>Giving by month</label>
+        <div id="dashboard-giving" class="checklist"></div>
+        <label>Campaign progress</label>
+        <div id="dashboard-campaigns" class="checklist"></div>
+        <label>Export reports (CSV)</label>
+        <div id="exports" class="actions">
+          <a id="export-attendance" href="/exports/attendance.csv" download>Attendance</a>
+          <a id="export-giving" href="/exports/giving.csv" download>Giving</a>
+          <a id="export-fundraising" href="/exports/fundraising.csv" download>Fundraising</a>
+        </div>
+        <div class="msg" id="dashboard-msg"></div>
+      </div>
+
+      <div class="card">
+        <h2>Directory</h2>
+        <div class="filters">
+          <input id="search-q" placeholder="Search by name…" />
+          <select id="filter-household"></select>
+          <select id="filter-status">
+            <option value="">All statuses</option>
+            <option value="active">active</option>
+            <option value="inactive">inactive</option>
+          </select>
+          <select id="filter-division"></select>
+          <select id="filter-tag"></select>
+          <button type="button" class="ghost" id="clear-filters">Clear</button>
+        </div>
+        <table>
+          <thead>
+            <tr><th>Name</th><th>Email</th><th>Phone</th><th>Status</th><th>Household</th><th>Divisions</th><th>Tags</th><th></th></tr>
+          </thead>
+          <tbody id="directory"></tbody>
+        </table>
+        <div class="msg" id="dir-msg"></div>
+      </div>
+
+      <div class="card" id="manage-panel">
+        <h2>Manage households &amp; tags</h2>
+        <div class="hint">Deleting a household or tag removes it from members but never deletes the members themselves or their giving history.</div>
+        <label>Households</label>
+        <div id="manage-households" class="checklist"></div>
+        <label>Ministry tags</label>
+        <div id="manage-tags" class="checklist"></div>
+        <div class="msg" id="manage-msg"></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    // Escape text before interpolating into innerHTML so member names, error
+    // messages, etc. can never inject markup/script (stored XSS).
+    const esc = (s) =>
+      String(s ?? "").replace(/[&<>"']/g, (c) =>
+        ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
+      );
+    let households = [];
+    let divisions = [];
+    let tags = [];
+    let services = [];
+    let allMembers = [];
+    let events = [];
+    let lastProfile = null;
+
+    async function api(path, opts) {
+      const res = await fetch(path, opts);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || ("Request failed: " + res.status));
+      return data;
+    }
+
+    function fillSelect(select, items, selectedId) {
+      select.innerHTML = "";
+      const placeholder = document.createElement("option");
+      placeholder.value = "";
+      placeholder.textContent = "— select —";
+      select.appendChild(placeholder);
+      for (const item of items) {
+        const opt = document.createElement("option");
+        opt.value = item.id;
+        opt.textContent = item.name;
+        if (String(item.id) === String(selectedId)) opt.selected = true;
+        select.appendChild(opt);
+      }
+    }
+
+    function nameOf(list, id) {
+      const found = list.find((x) => x.id === id);
+      return found ? found.name : "—";
+    }
+
+    function divisionNames(ids) {
+      if (!ids || !ids.length) return "—";
+      return ids.map((id) => nameOf(divisions, id)).join(", ");
+    }
+
+    function tagNames(ids) {
+      if (!ids || !ids.length) return "—";
+      return ids.map((id) => nameOf(tags, id)).join(", ");
+    }
+
+    // Fill a single-select used as a directory filter, with a leading "All" option.
+    function fillFilterSelect(select, items, allLabel) {
+      const current = select.value;
+      select.innerHTML = "";
+      const all = document.createElement("option");
+      all.value = "";
+      all.textContent = allLabel;
+      select.appendChild(all);
+      for (const item of items) {
+        const opt = document.createElement("option");
+        opt.value = item.id;
+        opt.textContent = item.name;
+        select.appendChild(opt);
+      }
+      select.value = current; // preserve selection across reloads
+    }
+
+    // Fill a <datalist> with one <option> per item name, for free-text autocomplete.
+    function fillDatalist(list, items) {
+      list.innerHTML = "";
+      for (const item of items) {
+        const opt = document.createElement("option");
+        opt.value = item.name;
+        list.appendChild(opt);
+      }
+    }
+
+    // Fill a <select multiple> and pre-select the given list of ids.
+    function fillMultiSelect(select, items, selectedIds) {
+      const selected = new Set((selectedIds || []).map((x) => String(x)));
+      select.innerHTML = "";
+      for (const item of items) {
+        const opt = document.createElement("option");
+        opt.value = item.id;
+        opt.textContent = item.name;
+        if (selected.has(String(item.id))) opt.selected = true;
+        select.appendChild(opt);
+      }
+    }
+
+    function selectedDivisionIds() {
+      return Array.from($("division_ids").selectedOptions).map((o) => Number(o.value));
+    }
+
+    // Find an existing lookup item by name (case-insensitive), or create it via POST.
+    // Returns the item's id. `list` is the in-memory cache (households or tags).
+    async function findOrCreate(path, list, name) {
+      const trimmed = name.trim();
+      if (!trimmed) return null;
+      const existing = list.find(
+        (x) => x.name.trim().toLowerCase() === trimmed.toLowerCase()
+      );
+      if (existing) return existing.id;
+      const created = await api(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmed }),
+      });
+      list.push(created); // keep cache fresh so a repeated name isn't created twice
+      return created.id;
+    }
+
+    // Resolve the comma-separated tag text box into a list of tag ids,
+    // creating any tags that don't exist yet.
+    async function resolveTagIds() {
+      const names = $("tags_text").value
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const seen = new Set();
+      const ids = [];
+      for (const name of names) {
+        const key = name.toLowerCase();
+        if (seen.has(key)) continue; // ignore duplicates typed in the same box
+        seen.add(key);
+        ids.push(await findOrCreate("/tags", tags, name));
+      }
+      return ids;
+    }
+
+    async function loadLookups() {
+      [households, divisions, tags] = await Promise.all([
+        api("/households"),
+        api("/divisions"),
+        api("/tags"),
+      ]);
+      fillDatalist($("household-options"), households);
+      fillDatalist($("tag-options"), tags);
+      fillSelect($("division_id"), divisions, $("division_id").value);
+      fillMultiSelect($("division_ids"), divisions, selectedDivisionIds());
+      // Directory filter selects.
+      fillFilterSelect($("filter-household"), households, "All households");
+      fillFilterSelect($("filter-division"), divisions, "All divisions");
+      fillFilterSelect($("filter-tag"), tags, "All tags");
+      renderManageLists();
+    }
+
+    function setManageMsg(text, ok) {
+      const el = $("manage-msg");
+      el.textContent = text || "";
+      el.className = "msg" + (text ? (ok ? " ok" : " error") : "");
+    }
+
+    // Render the delete-able lists of households and tags. Deleting one refreshes
+    // every dependent view (lookups, directory) since members may detach from it.
+    function renderManageLists() {
+      const build = (boxId, items, path, label) => {
+        const box = $(boxId);
+        box.innerHTML = items.length ? "" : `<div class="hint">No ${label}s yet.</div>`;
+        for (const item of items) {
+          const row = document.createElement("div");
+          row.className = "manage-row";
+          const name = document.createElement("span");
+          name.textContent = item.name;
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "ghost danger";
+          btn.textContent = "✕";
+          btn.title = `Delete ${label}`;
+          btn.addEventListener("click", async () => {
+            if (!confirm(`Delete ${label} "${item.name}"? It will be removed from any members that have it.`)) return;
+            try {
+              await api(`${path}/${item.id}`, { method: "DELETE" });
+              await loadLookups();
+              await loadDirectory();
+              setManageMsg(`${label[0].toUpperCase() + label.slice(1)} "${item.name}" deleted.`, true);
+            } catch (err) {
+              setManageMsg(err.message, false);
+            }
+          });
+          row.appendChild(name);
+          row.appendChild(btn);
+          box.appendChild(row);
+        }
+      };
+      build("manage-households", households, "/households", "household");
+      build("manage-tags", tags, "/tags", "tag");
+    }
+
+    function currentFilterQuery() {
+      const params = new URLSearchParams();
+      const q = $("search-q").value.trim();
+      if (q) params.set("q", q);
+      if ($("filter-household").value) params.set("household_id", $("filter-household").value);
+      if ($("filter-status").value) params.set("status", $("filter-status").value);
+      if ($("filter-division").value) params.set("division_id", $("filter-division").value);
+      if ($("filter-tag").value) params.set("tag_id", $("filter-tag").value);
+      const qs = params.toString();
+      return qs ? `/members?${qs}` : "/members";
+    }
+
+    async function loadDirectory() {
+      const members = await api(currentFilterQuery());
+      const tbody = $("directory");
+      tbody.innerHTML = "";
+      if (!members.length) {
+        tbody.innerHTML = '<tr><td colspan="8">No members match — adjust the search or filters.</td></tr>';
+        return;
+      }
+      for (const m of members) {
+        const tr = document.createElement("tr");
+        tr.className = "clickable";
+        const statusClass = m.status === "active" ? "pill" : "pill inactive";
+        tr.innerHTML =
+          `<td>${esc(m.first_name)} ${esc(m.last_name)}</td>` +
+          `<td>${esc(m.email || "—")}</td>` +
+          `<td>${esc(m.phone || "—")}</td>` +
+          `<td><span class="${statusClass}">${esc(m.status)}</span></td>` +
+          `<td>${esc(nameOf(households, m.household_id))}</td>` +
+          `<td>${esc(divisionNames(m.division_ids))}</td>` +
+          `<td>${esc(tagNames(m.tag_ids))}</td>` +
+          `<td><button type="button" class="ghost danger" title="Delete member">✕</button></td>`;
+        tr.addEventListener("click", () => showProfile(m));
+        // The delete button lives inside the row; stop the click from also
+        // opening the profile, and confirm before removing.
+        tr.querySelector("button").addEventListener("click", async (ev) => {
+          ev.stopPropagation();
+          if (!confirm(`Delete ${m.first_name} ${m.last_name}? This cannot be undone.`)) return;
+          try {
+            await api(`/members/${m.id}`, { method: "DELETE" });
+            if (lastProfile && lastProfile.id === m.id) $("profile").hidden = true;
+            await loadDirectory();
+            await loadAttendance();
+            setDirMsg(`${m.first_name} ${m.last_name} deleted.`, true);
+          } catch (err) {
+            setDirMsg(err.message, false);
+          }
+        });
+        tbody.appendChild(tr);
+      }
+    }
+
+    // --- Attendance (Story 2.1) ---
+    function setAttMsg(text, ok) {
+      const el = $("attendance-msg");
+      el.textContent = text || "";
+      el.className = "msg" + (text ? (ok ? " ok" : " error") : "");
+    }
+
+    async function loadAttendance() {
+      [services, allMembers] = await Promise.all([api("/services"), api("/members")]);
+      // Service select (most recent first by id).
+      const sel = $("attendance-service");
+      const current = sel.value;
+      sel.innerHTML = "";
+      if (!services.length) {
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = "— create a service first —";
+        sel.appendChild(opt);
+      }
+      for (const s of services) {
+        const opt = document.createElement("option");
+        opt.value = s.id;
+        opt.textContent = `${s.name} (${s.date})`;
+        sel.appendChild(opt);
+      }
+      // Restore the previous selection; if it no longer matches a real option
+      // (e.g. first load, where current === ""), fall back to the first service
+      // so a service is actually selected and the breakdown loads for it.
+      sel.value = current;
+      if (sel.selectedIndex < 0 && sel.options.length) {
+        sel.selectedIndex = 0;
+      }
+      // Member checklist.
+      const box = $("attendance-members");
+      box.innerHTML = "";
+      if (!allMembers.length) {
+        box.innerHTML = '<div class="hint">No members yet — add some first.</div>';
+        return;
+      }
+      for (const m of allMembers) {
+        const label = document.createElement("label");
+        label.innerHTML =
+          `<input type="checkbox" value="${m.id}" /> ${esc(m.first_name)} ${esc(m.last_name)}`;
+        box.appendChild(label);
+      }
+      await loadByDivision();
+    }
+
+    // Per-division breakdown for the selected service (Story 2.2).
+    async function loadByDivision() {
+      const box = $("attendance-by-division");
+      const serviceId = $("attendance-service").value;
+      box.innerHTML = "";
+      if (!serviceId) {
+        box.innerHTML = '<div class="hint">Select a service to see the breakdown.</div>';
+        return;
+      }
+      try {
+        const rows = await api(`/services/${serviceId}/attendance/by-division`);
+        if (!rows.length) {
+          box.innerHTML = '<div class="hint">No attendance recorded yet.</div>';
+          return;
+        }
+        for (const r of rows) {
+          const line = document.createElement("div");
+          line.textContent = `${r.division_name}: ${r.present}`;
+          box.appendChild(line);
+        }
+      } catch (err) {
+        box.innerHTML = `<div class="hint">${esc(err.message)}</div>`;
+      }
+    }
+
+    async function createService() {
+      const name = $("service-name").value.trim();
+      const date = $("service-date").value;
+      if (!name || !date) {
+        setAttMsg("Service name and date are required.", false);
+        return;
+      }
+      try {
+        const svc = await api("/services", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, date }),
+        });
+        $("service-name").value = "";
+        $("service-date").value = "";
+        await loadAttendance();
+        $("attendance-service").value = svc.id;
+        setAttMsg(`Service "${svc.name}" created.`, true);
+      } catch (err) {
+        setAttMsg(err.message, false);
+      }
+    }
+
+    async function saveAttendance() {
+      const serviceId = $("attendance-service").value;
+      if (!serviceId) {
+        setAttMsg("Select or create a service first.", false);
+        return;
+      }
+      const memberIds = Array.from(
+        $("attendance-members").querySelectorAll('input[type="checkbox"]:checked')
+      ).map((c) => Number(c.value));
+      if (!memberIds.length) {
+        setAttMsg("Check at least one member as present.", false);
+        return;
+      }
+      try {
+        const present = await api(`/services/${serviceId}/attendance`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ member_ids: memberIds }),
+        });
+        setAttMsg(`Attendance saved — ${present.length} present.`, true);
+        await loadByDivision();
+        if (lastProfile) await refreshProfileHistory();
+      } catch (err) {
+        setAttMsg(err.message, false);
+      }
+    }
+
+    async function refreshProfileHistory() {
+      if (!lastProfile) return;
+      try {
+        const history = await api(`/members/${lastProfile.id}/attendance`);
+        const text = history.length
+          ? history.map((h) => `${h.name} (${h.date})`).join(", ")
+          : "—";
+        const el = $("profile-attendance");
+        if (el) el.textContent = text;
+      } catch (err) {
+        /* non-fatal */
+      }
+    }
+
+    // --- Events & RSVPs (Story 2.3) ---
+    function setEventMsg(text, ok) {
+      const el = $("event-msg");
+      el.textContent = text || "";
+      el.className = "msg" + (text ? (ok ? " ok" : " error") : "");
+    }
+
+    async function loadEvents() {
+      [events, allMembers] = await Promise.all([api("/events"), api("/members")]);
+      const sel = $("rsvp-event");
+      const current = sel.value;
+      sel.innerHTML = "";
+      if (!events.length) {
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = "— create an event first —";
+        sel.appendChild(opt);
+      }
+      for (const e of events) {
+        const opt = document.createElement("option");
+        opt.value = e.id;
+        opt.textContent = `${e.name} (${e.date})`;
+        sel.appendChild(opt);
+      }
+      sel.value = current;
+      if (sel.selectedIndex < 0 && sel.options.length) sel.selectedIndex = 0;
+      await loadRsvps();
+    }
+
+    async function loadRsvps() {
+      const box = $("rsvp-members");
+      const eventId = $("rsvp-event").value;
+      box.innerHTML = "";
+      $("rsvp-summary").textContent = "";
+      if (!eventId) {
+        box.innerHTML = '<div class="hint">Select an event to RSVP.</div>';
+        return;
+      }
+      if (!allMembers.length) {
+        box.innerHTML = '<div class="hint">No members yet — add some first.</div>';
+        return;
+      }
+      try {
+        const [rsvps, summary] = await Promise.all([
+          api(`/events/${eventId}/rsvps`),
+          api(`/events/${eventId}/summary`),
+        ]);
+        const responseByMember = {};
+        for (const r of rsvps) responseByMember[r.member_id] = r.response;
+        $("rsvp-summary").textContent =
+          `Attending: ${summary.yes_count} · Not attending: ${summary.no_count} · Total responded: ${summary.total}`;
+        for (const m of allMembers) {
+          const current = responseByMember[m.id] || "";
+          const row = document.createElement("div");
+          const yesChecked = current === "yes" ? "checked" : "";
+          const noChecked = current === "no" ? "checked" : "";
+          row.innerHTML =
+            `${esc(m.first_name)} ${esc(m.last_name)} ` +
+            `<label><input type="radio" name="rsvp-${m.id}" value="yes" ${yesChecked} /> yes</label> ` +
+            `<label><input type="radio" name="rsvp-${m.id}" value="no" ${noChecked} /> no</label>`;
+          row.querySelectorAll('input[type="radio"]').forEach((input) => {
+            input.addEventListener("change", () => sendRsvp(m.id, input.value));
+          });
+          box.appendChild(row);
+        }
+      } catch (err) {
+        box.innerHTML = `<div class="hint">${esc(err.message)}</div>`;
+      }
+    }
+
+    async function sendRsvp(memberId, response) {
+      const eventId = $("rsvp-event").value;
+      if (!eventId) return;
+      try {
+        const summary = await api(`/events/${eventId}/rsvps`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ member_id: Number(memberId), response }),
+        });
+        $("rsvp-summary").textContent =
+          `Attending: ${summary.yes_count} · Not attending: ${summary.no_count} · Total responded: ${summary.total}`;
+        setEventMsg("RSVP saved.", true);
+      } catch (err) {
+        setEventMsg(err.message, false);
+      }
+    }
+
+    async function createEvent() {
+      const name = $("event-name").value.trim();
+      const date = $("event-date").value;
+      if (!name || !date) {
+        setEventMsg("Event name and date are required.", false);
+        return;
+      }
+      try {
+        const ev = await api("/events", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name,
+            date,
+            location: $("event-location").value.trim() || null,
+            description: $("event-description").value.trim() || null,
+          }),
+        });
+        $("event-name").value = "";
+        $("event-date").value = "";
+        $("event-location").value = "";
+        $("event-description").value = "";
+        await loadEvents();
+        $("rsvp-event").value = ev.id;
+        await loadRsvps();
+        setEventMsg(`Event "${ev.name}" created.`, true);
+      } catch (err) {
+        setEventMsg(err.message, false);
+      }
+    }
+
+    // --- Giving (Story 3.1) ---
+    function setGivingMsg(text, ok) {
+      const el = $("giving-msg");
+      el.textContent = text || "";
+      el.className = "msg" + (text ? (ok ? " ok" : " error") : "");
+    }
+
+    function memberLabel(id) {
+      const m = allMembers.find((x) => x.id === id);
+      return m ? `${m.first_name} ${m.last_name}` : `member #${id}`;
+    }
+
+    async function loadGiving() {
+      allMembers = await api("/members");
+      fillSelect($("donation-member"), allMembers.map((m) => ({
+        id: m.id,
+        name: `${m.first_name} ${m.last_name}`,
+      })));
+      fillSelect($("donation-household"), households);
+      await loadDonations();
+    }
+
+    async function loadDonations() {
+      const box = $("donation-list");
+      box.innerHTML = "";
+      try {
+        const donations = await api("/donations");
+        if (!donations.length) {
+          box.innerHTML = '<div class="hint">No donations recorded yet.</div>';
+          return;
+        }
+        for (const d of donations.slice().reverse()) {
+          const who = d.member_id
+            ? memberLabel(d.member_id)
+            : `household: ${nameOf(households, d.household_id)}`;
+          const line = document.createElement("div");
+          line.textContent = `${d.date} · ${d.amount.toFixed(2)} · ${d.donation_type} · ${who}`;
+          box.appendChild(line);
+        }
+      } catch (err) {
+        box.innerHTML = `<div class="hint">${esc(err.message)}</div>`;
+      }
+    }
+
+    async function saveDonation() {
+      const amount = Number($("donation-amount").value);
+      const date = $("donation-date").value;
+      const donationType = $("donation-type").value.trim();
+      const memberId = $("donation-member").value;
+      const householdId = $("donation-household").value;
+      if (!amount || amount <= 0 || !date || !donationType) {
+        setGivingMsg("Amount (positive), date, and type are required.", false);
+        return;
+      }
+      if (!memberId && !householdId) {
+        setGivingMsg("Select a member or a household.", false);
+        return;
+      }
+      try {
+        await api("/donations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            amount,
+            date,
+            donation_type: donationType,
+            member_id: memberId ? Number(memberId) : null,
+            household_id: householdId ? Number(householdId) : null,
+          }),
+        });
+        $("donation-amount").value = "";
+        $("donation-type").value = "";
+        await loadDonations();
+        setGivingMsg("Donation recorded.", true);
+      } catch (err) {
+        setGivingMsg(err.message, false);
+      }
+    }
+
+    // --- Fundraising (Story 3.2) ---
+    let campaigns = [];
+    function setFundMsg(text, ok) {
+      const el = $("fundraising-msg");
+      el.textContent = text || "";
+      el.className = "msg" + (text ? (ok ? " ok" : " error") : "");
+    }
+
+    async function loadFundraising() {
+      [campaigns, allMembers] = await Promise.all([
+        api("/campaigns"),
+        api("/members"),
+      ]);
+      const sel = $("pledge-campaign");
+      const current = sel.value;
+      sel.innerHTML = "";
+      if (!campaigns.length) {
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = "— create a campaign first —";
+        sel.appendChild(opt);
+      }
+      for (const c of campaigns) {
+        const opt = document.createElement("option");
+        opt.value = c.id;
+        opt.textContent = `${c.name} (target ${c.target_amount.toFixed(2)})`;
+        sel.appendChild(opt);
+      }
+      sel.value = current;
+      if (sel.selectedIndex < 0 && sel.options.length) sel.selectedIndex = 0;
+      fillSelect($("pledge-member"), allMembers.map((m) => ({
+        id: m.id,
+        name: `${m.first_name} ${m.last_name}`,
+      })));
+      await loadProgress();
+    }
+
+    async function loadProgress() {
+      const el = $("campaign-progress");
+      const id = $("pledge-campaign").value;
+      if (!id) {
+        el.textContent = "";
+        return;
+      }
+      try {
+        const p = await api(`/campaigns/${id}/progress`);
+        el.textContent =
+          `Raised ${p.total_raised.toFixed(2)} of ${p.target.toFixed(2)} ` +
+          `(${p.percent_raised.toFixed(1)}%) · pledged ${p.total_pledged.toFixed(2)} · ` +
+          `remaining ${p.remaining.toFixed(2)}`;
+      } catch (err) {
+        el.textContent = err.message;
+      }
+    }
+
+    async function createCampaign() {
+      const name = $("campaign-name").value.trim();
+      const target = Number($("campaign-target").value);
+      if (!name || !target || target <= 0) {
+        setFundMsg("Campaign name and a positive target are required.", false);
+        return;
+      }
+      try {
+        const c = await api("/campaigns", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, target_amount: target }),
+        });
+        $("campaign-name").value = "";
+        $("campaign-target").value = "";
+        await loadFundraising();
+        $("pledge-campaign").value = c.id;
+        await loadProgress();
+        setFundMsg(`Campaign "${c.name}" created.`, true);
+      } catch (err) {
+        setFundMsg(err.message, false);
+      }
+    }
+
+    async function savePledge() {
+      const id = $("pledge-campaign").value;
+      const amount = Number($("pledge-amount").value);
+      const memberId = $("pledge-member").value;
+      if (!id) {
+        setFundMsg("Select or create a campaign first.", false);
+        return;
+      }
+      if (!amount || amount <= 0) {
+        setFundMsg("Pledge amount must be positive.", false);
+        return;
+      }
+      try {
+        await api(`/campaigns/${id}/pledges`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            amount,
+            member_id: memberId ? Number(memberId) : null,
+          }),
+        });
+        $("pledge-amount").value = "";
+        await loadProgress();
+        setFundMsg("Pledge recorded.", true);
+      } catch (err) {
+        setFundMsg(err.message, false);
+      }
+    }
+
+    // --- Giving Summary (Story 3.3) ---
+    async function loadSummary() {
+      const msg = $("summary-msg");
+      msg.textContent = "";
+      msg.className = "msg";
+      try {
+        const [summary, campaignProgress] = await Promise.all([
+          api("/giving/summary"),
+          api("/giving/campaigns/progress"),
+        ]);
+        $("summary-total").textContent =
+          `Grand total: ${summary.grand_total.toFixed(2)}`;
+
+        const periodBox = $("summary-period");
+        periodBox.innerHTML = summary.by_period.length
+          ? ""
+          : '<div class="hint">No donations yet.</div>';
+        for (const p of summary.by_period) {
+          const line = document.createElement("div");
+          line.textContent = `${p.period}: ${p.total.toFixed(2)} (${p.count})`;
+          periodBox.appendChild(line);
+        }
+
+        const donorBox = $("summary-donors");
+        // Show donors by descending total, top 10.
+        const donors = summary.by_donor
+          .slice()
+          .sort((a, b) => b.total - a.total)
+          .slice(0, 10);
+        donorBox.innerHTML = donors.length
+          ? ""
+          : '<div class="hint">No member-attributed gifts.</div>';
+        for (const d of donors) {
+          const line = document.createElement("div");
+          line.textContent = `${memberLabel(d.member_id)}: ${d.total.toFixed(2)} (${d.count})`;
+          donorBox.appendChild(line);
+        }
+
+        const campBox = $("summary-campaigns");
+        campBox.innerHTML = campaignProgress.length
+          ? ""
+          : '<div class="hint">No campaigns yet.</div>';
+        for (const c of campaignProgress) {
+          const line = document.createElement("div");
+          line.textContent =
+            `${c.name}: ${c.total_raised.toFixed(2)} / ${c.target.toFixed(2)} (${c.percent_raised.toFixed(1)}%)`;
+          campBox.appendChild(line);
+        }
+      } catch (err) {
+        msg.textContent = err.message;
+        msg.className = "msg error";
+      }
+    }
+
+    // --- Announcements (Story 4.1) ---
+    function setAnnMsg(text, ok) {
+      const el = $("announcement-msg");
+      el.textContent = text || "";
+      el.className = "msg" + (text ? (ok ? " ok" : " error") : "");
+    }
+
+    function announcementFilters() {
+      const params = new URLSearchParams();
+      const div = $("announcement-division").value;
+      const tag = $("announcement-tag").value;
+      const hh = $("announcement-household").value;
+      if (div) params.set("division_id", div);
+      if (tag) params.set("tag_id", tag);
+      if (hh) params.set("household_id", hh);
+      return params;
+    }
+
+    async function loadAnnouncements() {
+      fillSelect($("announcement-division"), divisions);
+      fillSelect($("announcement-tag"), tags);
+      fillSelect($("announcement-household"), households);
+      await Promise.all([previewAudience(), refreshAnnouncementLog()]);
+    }
+
+    async function previewAudience() {
+      try {
+        const params = announcementFilters();
+        const res = await api(`/announcements/preview?${params.toString()}`);
+        $("announcement-preview").textContent =
+          `Will reach ${res.recipient_count} member(s).`;
+      } catch (err) {
+        $("announcement-preview").textContent = err.message;
+      }
+    }
+
+    async function refreshAnnouncementLog() {
+      const box = $("announcement-log");
+      box.innerHTML = "";
+      try {
+        const log = await api("/announcements");
+        if (!log.length) {
+          box.innerHTML = '<div class="hint">No announcements sent yet.</div>';
+          return;
+        }
+        for (const a of log) {
+          const line = document.createElement("div");
+          line.textContent = `${a.date} · ${a.subject} → ${a.recipient_count} recipient(s)`;
+          box.appendChild(line);
+        }
+      } catch (err) {
+        box.innerHTML = `<div class="hint">${esc(err.message)}</div>`;
+      }
+    }
+
+    async function sendAnnouncement() {
+      const subject = $("announcement-subject").value.trim();
+      const body = $("announcement-body").value.trim();
+      if (!subject || !body) {
+        setAnnMsg("Subject and message are required.", false);
+        return;
+      }
+      const div = $("announcement-division").value;
+      const tag = $("announcement-tag").value;
+      const hh = $("announcement-household").value;
+      try {
+        const sent = await api("/announcements", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            subject,
+            body,
+            date: new Date().toISOString().slice(0, 10),
+            division_id: div ? Number(div) : null,
+            tag_id: tag ? Number(tag) : null,
+            household_id: hh ? Number(hh) : null,
+          }),
+        });
+        $("announcement-subject").value = "";
+        $("announcement-body").value = "";
+        await refreshAnnouncementLog();
+        setAnnMsg(`Sent to ${sent.recipient_count} member(s).`, true);
+      } catch (err) {
+        setAnnMsg(err.message, false);
+      }
+    }
+
+    // --- Dashboard (Story 4.2) ---
+    async function loadDashboard() {
+      const msg = $("dashboard-msg");
+      msg.textContent = "";
+      msg.className = "msg";
+      try {
+        const d = await api("/dashboard");
+        const metrics = [
+          ["Members", d.member_count],
+          ["Services", d.service_count],
+          ["Attendance records", d.attendance_count],
+          ["Events", d.event_count],
+          ["Campaigns", d.campaign_count],
+          ["Total giving", d.total_giving.toFixed(2)],
+        ];
+        const mBox = $("dashboard-metrics");
+        mBox.innerHTML = "";
+        for (const [label, value] of metrics) {
+          const line = document.createElement("div");
+          line.textContent = `${label}: ${value}`;
+          mBox.appendChild(line);
+        }
+
+        renderList("dashboard-attendance", d.attendance_by_service,
+          (s) => `${s.name} (${s.date}): ${s.present} present`, "No services yet.");
+        renderList("dashboard-giving", d.giving_by_period,
+          (p) => `${p.period}: ${p.total.toFixed(2)} (${p.count})`, "No giving yet.");
+        renderList("dashboard-campaigns", d.campaigns,
+          (c) => `${c.name}: ${c.total_raised.toFixed(2)} / ${c.target.toFixed(2)} (${c.percent_raised.toFixed(1)}%)`,
+          "No campaigns yet.");
+      } catch (err) {
+        msg.textContent = err.message;
+        msg.className = "msg error";
+      }
+    }
+
+    function renderList(boxId, items, fmt, emptyText) {
+      const box = $(boxId);
+      box.innerHTML = items.length ? "" : `<div class="hint">${emptyText}</div>`;
+      for (const item of items) {
+        const line = document.createElement("div");
+        line.textContent = fmt(item);
+        box.appendChild(line);
+      }
+    }
+
+    function showProfile(m) {
+      lastProfile = m;
+      $("profile-body").innerHTML =
+        `<dt>Name</dt><dd>${esc(m.first_name)} ${esc(m.last_name)}</dd>` +
+        `<dt>Email</dt><dd>${esc(m.email || "—")}</dd>` +
+        `<dt>Phone</dt><dd>${esc(m.phone || "—")}</dd>` +
+        `<dt>Status</dt><dd>${esc(m.status)}</dd>` +
+        `<dt>Household</dt><dd>${esc(nameOf(households, m.household_id))}</dd>` +
+        `<dt>Primary division</dt><dd>${esc(nameOf(divisions, m.division_id))}</dd>` +
+        `<dt>Divisions</dt><dd>${esc(divisionNames(m.division_ids))}</dd>` +
+        `<dt>Tags</dt><dd>${esc(tagNames(m.tag_ids))}</dd>` +
+        `<dt>Attendance</dt><dd id="profile-attendance">…</dd>`;
+      $("profile").hidden = false;
+      refreshProfileHistory();
+    }
+
+    function loadIntoForm(m) {
+      $("form-title").textContent = "Edit Member";
+      $("member-id").value = m.id;
+      $("first_name").value = m.first_name;
+      $("last_name").value = m.last_name;
+      $("email").value = m.email || "";
+      $("phone").value = m.phone || "";
+      $("status").value = m.status;
+      $("household_name").value = m.household_id ? nameOf(households, m.household_id) : "";
+      fillSelect($("division_id"), divisions, m.division_id);
+      fillMultiSelect($("division_ids"), divisions, m.division_ids);
+      $("tags_text").value = (m.tag_ids || []).map((id) => nameOf(tags, id)).join(", ");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function resetForm() {
+      $("form-title").textContent = "Add Member";
+      $("member-form").reset();
+      $("member-id").value = "";
+      $("form-msg").textContent = "";
+      $("form-msg").className = "msg";
+      $("household_name").value = "";
+      fillSelect($("division_id"), divisions, "");
+      fillMultiSelect($("division_ids"), divisions, []);
+      $("tags_text").value = "";
+    }
+
+    function setMsg(text, ok) {
+      const el = $("form-msg");
+      el.textContent = text;
+      el.className = "msg " + (ok ? "ok" : "error");
+    }
+
+    async function submitForm(e) {
+      e.preventDefault();
+      const id = $("member-id").value;
+      const primaryDivision = $("division_id").value ? Number($("division_id").value) : null;
+      // The primary division is always part of the assignment set (AC #1).
+      const divisionIds = Array.from(
+        new Set([
+          ...(primaryDivision !== null ? [primaryDivision] : []),
+          ...selectedDivisionIds(),
+        ])
+      );
+      try {
+        // Resolve free-typed household and tag names into ids, creating any new ones.
+        const householdId = await findOrCreate(
+          "/households",
+          households,
+          $("household_name").value
+        );
+        const tagIds = await resolveTagIds();
+        // Refresh datalists so newly created names show up as suggestions next time.
+        fillDatalist($("household-options"), households);
+        fillDatalist($("tag-options"), tags);
+        const payload = {
+          first_name: $("first_name").value.trim(),
+          last_name: $("last_name").value.trim(),
+          email: $("email").value.trim() || null,
+          phone: $("phone").value.trim() || null,
+          status: $("status").value,
+          household_id: householdId,
+          division_id: primaryDivision,
+          division_ids: divisionIds,
+          tag_ids: tagIds,
+        };
+        const saved = id
+          ? await api(`/members/${id}`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            })
+          : await api("/members", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+        setMsg(id ? "Member updated." : "Member created.", true);
+        resetForm();
+        await loadDirectory();
+        await loadAttendance();
+        showProfile(saved);
+      } catch (err) {
+        setMsg(err.message, false);
+      }
+    }
+
+    async function quickAdd(path, name, listName) {
+      if (!name.trim()) return;
+      try {
+        await api(path, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: name.trim() }),
+        });
+        await loadLookups();
+        setMsg(`${listName} added.`, true);
+      } catch (err) {
+        setMsg(err.message, false);
+      }
+    }
+
+    $("member-form").addEventListener("submit", submitForm);
+    $("reset-btn").addEventListener("click", resetForm);
+    $("edit-btn").addEventListener("click", () => lastProfile && loadIntoForm(lastProfile));
+    $("add-division").addEventListener("click", () => {
+      quickAdd("/divisions", $("new-division").value, "Division").then(() => ($("new-division").value = ""));
+    });
+    $("create-service").addEventListener("click", createService);
+    $("save-attendance").addEventListener("click", saveAttendance);
+    $("attendance-service").addEventListener("change", () =>
+      loadByDivision().catch((e) => setAttMsg(e.message, false))
+    );
+    $("create-event").addEventListener("click", createEvent);
+    $("rsvp-event").addEventListener("change", () =>
+      loadRsvps().catch((e) => setEventMsg(e.message, false))
+    );
+    $("save-donation").addEventListener("click", saveDonation);
+    $("create-campaign").addEventListener("click", createCampaign);
+    $("save-pledge").addEventListener("click", savePledge);
+    $("pledge-campaign").addEventListener("change", () =>
+      loadProgress().catch((e) => setFundMsg(e.message, false))
+    );
+    $("refresh-summary").addEventListener("click", loadSummary);
+    $("send-announcement").addEventListener("click", sendAnnouncement);
+    $("refresh-dashboard").addEventListener("click", loadDashboard);
+    ["announcement-division", "announcement-tag", "announcement-household"].forEach((id) => {
+      $(id).addEventListener("change", () =>
+        previewAudience().catch((e) => setAnnMsg(e.message, false))
+      );
+    });
+
+    // --- Directory search & filtering ---
+    let searchTimer = null;
+    function debouncedReload() {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => loadDirectory().catch((e) => setDirMsg(e.message)), 250);
+    }
+    // `ok` defaults to false so existing callers (which pass only an error
+    // string) still render in the error style.
+    function setDirMsg(text, ok = false) {
+      $("dir-msg").textContent = text || "";
+      $("dir-msg").className = "msg" + (text ? (ok ? " ok" : " error") : "");
+    }
+    $("search-q").addEventListener("input", debouncedReload);
+    ["filter-household", "filter-status", "filter-division", "filter-tag"].forEach((id) => {
+      $(id).addEventListener("change", () => loadDirectory().catch((e) => setDirMsg(e.message)));
+    });
+    $("clear-filters").addEventListener("click", () => {
+      $("search-q").value = "";
+      $("filter-household").value = "";
+      $("filter-status").value = "";
+      $("filter-division").value = "";
+      $("filter-tag").value = "";
+      loadDirectory().catch((e) => setDirMsg(e.message));
+    });
+
+    (async () => {
+      try {
+        await loadLookups();
+        await loadDirectory();
+        await loadAttendance();
+        await loadEvents();
+        await loadGiving();
+        await loadFundraising();
+        await loadSummary();
+        await loadAnnouncements();
+        await loadDashboard();
+      } catch (err) {
+        $("dir-msg").textContent = err.message;
+        $("dir-msg").className = "msg error";
+      }
+    })();
+  </script>
+</body>
+</html>

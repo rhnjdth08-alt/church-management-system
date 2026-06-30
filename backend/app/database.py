@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from sqlmodel import Session, SQLModel, create_engine
+from sqlmodel import Session, SQLModel, create_engine  # type: ignore[import]
 
 from .models import Member  # ensure model metadata is registered before table creation
 
