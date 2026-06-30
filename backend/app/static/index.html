@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Church Management System — Members</title>
+  <style>
+    :root { --accent: #2c5f8a; --border: #d7dde3; --bg: #f5f7fa; }
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, Arial, sans-serif; margin: 0; background: var(--bg); color: #1f2933; }
+    header { background: var(--accent); color: #fff; padding: 16px 24px; }
+    header h1 { margin: 0; font-size: 20px; }
+    main { display: grid; grid-template-columns: 380px 1fr; gap: 24px; padding: 24px; align-items: start; }
+    .card { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 18px; }
+    .card h2 { margin-top: 0; font-size: 16px; }
+    label { display: block; font-size: 13px; margin: 10px 0 4px; font-weight: 600; }
+    input, select { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; }
+    .row { display: flex; gap: 10px; }
+    .row > div { flex: 1; }
+    button { cursor: pointer; border: none; border-radius: 6px; padding: 9px 14px; font-size: 14px; }
+    .primary { background: var(--accent); color: #fff; }
+    .ghost { background: #eef1f5; color: #1f2933; }
+    .actions { margin-top: 14px; display: flex; gap: 10px; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--border); }
+    tr.clickable:hover { background: #f0f4f8; cursor: pointer; }
+    .hint { font-size: 11px; color: #52606d; margin-top: 4px; }
+    select[multiple] { height: auto; padding: 4px; }
+    .filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+    .filters input, .filters select { width: auto; flex: 1; min-width: 120px; }
+    .filters button { flex: 0 0 auto; }
+    .checklist { max-height: 180px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; padding: 8px; }
+    .checklist label { display: flex; align-items: center; gap: 8px; font-weight: 400; margin: 2px 0; }
+    .checklist input[type="checkbox"] { width: auto; }
+    .msg { margin-top: 10px; font-size: 13px; min-height: 18px; }
+    .msg.error { color: #b00020; }
+    .msg.ok { color: #1a7f37; }
+    .inline-add { display: flex; gap: 6px; margin-top: 6px; }
+    .inline-add input { flex: 1; }
+    .inline-add button { white-space: nowrap; }
+    fieldset { border: 1px dashed var(--border); border-radius: 6px; margin-top: 14px; padding: 10px 12px; }
+    legend { font-size: 12px; color: #52606d; padding: 0 6px; }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; background: #e3f0e6; color: #1a7f37; }
+    .pill.inactive { background: #fbe5e5; color: #b00020; }
+    #profile dl { display: grid; grid-template-columns: 120px 1fr; gap: 6px 12px; font-size: 14px; }
+    #profile dt { font-weight: 600; color: #52606d; }
+  </style>
+</head>
+<body>
+  <header><h1>Church Management System — Member Directory</h1></header>
+  <main>
+    <section class="card">
+      <h2 id="form-title">Add Member</h2>
+      <form id="member-form">
+        <input type="hidden" id="member-id" />
+        <div class="row">
+          <div>
+            <label for="first_name">First name *</label>
+            <input id="first_name" required />
+          </div>
+          <div>
+            <label for="last_name">Last name *</label>
+            <input id="last_name" required />
+          </div>
+        </div>
+        <label for="email">Email</label>
+        <input id="email" type="email" placeholder="name@example.com" />
+        <label for="phone">Phone</label>
+        <input id="phone" placeholder="555-123-4567" />
+        <label for="status">Status</label>
+        <select id="status">
+          <option value="active">active</option>
+          <option value="inactive">inactive</option>
+        </select>
+
+        <label for="household_id">Household *</label>
+        <select id="household_id" required></select>
+        <div class="inline-add">
+          <input id="new-household" placeholder="New household name" />
+          <button type="button" class="ghost" id="add-household">+ Add</button>
+        </div>
+
+        <label for="division_id">Primary division *</label>
+        <select id="division_id" required></select>
+        <div class="inline-add">
+          <input id="new-division" placeholder="New division name" />
+          <button type="button" class="ghost" id="add-division">+ Add</button>
+        </div>
+
+        <label for="division_ids">Divisions (select one or more)</label>
+        <select id="division_ids" multiple size="4"></select>
+        <div class="hint">Hold Ctrl (or Cmd) to select multiple. The primary division is always included.</div>
+
+        <label for="tag_ids">Ministry tags (optional)</label>
+        <select id="tag_ids" multiple size="4"></select>
+        <div class="inline-add">
+          <input id="new-tag" placeholder="New tag name" />
+          <button type="button" class="ghost" id="add-tag">+ Add</button>
+        </div>
+
+        <div class="actions">
+          <button type="submit" class="primary" id="save-btn">Save Member</button>
+          <button type="button" class="ghost" id="reset-btn">Clear</button>
+        </div>
+        <div class="msg" id="form-msg"></div>
+      </form>
+    </section>
+
+    <section style="display:grid; gap:24px;">
+      <div class="card" id="profile" hidden>
+        <h2>Member Profile</h2>
+        <dl id="profile-body"></dl>
+        <div class="actions"><button type="button" class="ghost" id="edit-btn">Edit this member</button></div>
+      </div>
+
+      <div class="card" id="attendance-panel">
+        <h2>Record Attendance</h2>
+        <div class="row">
+          <div>
+            <label for="service-name">Service / event *</label>
+            <input id="service-name" placeholder="Sunday Service" />
+          </div>
+          <div>
+            <label for="service-date">Date *</label>
+            <input id="service-date" type="date" />
+          </div>
+        </div>
+        <div class="actions">
+          <button type="button" class="ghost" id="create-service">Create service</button>
+        </div>
+
+        <label for="attendance-service">Service to record against</label>
+        <select id="attendance-service"></select>
+        <label>Mark present</label>
+        <div id="attendance-members" class="checklist"></div>
+        <div class="actions">
+          <button type="button" class="primary" id="save-attendance">Save attendance</button>
+        </div>
+        <div class="msg" id="attendance-msg"></div>
+        <label>Attendance by division</label>
+        <div id="attendance-by-division" class="checklist"></div>
+      </div>
+
+      <div class="card">
+        <h2>Directory</h2>
+        <div class="filters">
+          <input id="search-q" placeholder="Search by name…" />
+          <select id="filter-household"></select>
+          <select id="filter-status">
+            <option value="">All statuses</option>
+            <option value="active">active</option>
+            <option value="inactive">inactive</option>
+          </select>
+          <select id="filter-division"></select>
+          <select id="filter-tag"></select>
+          <button type="button" class="ghost" id="clear-filters">Clear</button>
+        </div>
+        <table>
+          <thead>
+            <tr><th>Name</th><th>Email</th><th>Phone</th><th>Status</th><th>Household</th><th>Divisions</th><th>Tags</th></tr>
+          </thead>
+          <tbody id="directory"></tbody>
+        </table>
+        <div class="msg" id="dir-msg"></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let households = [];
+    let divisions = [];
+    let tags = [];
+    let services = [];
+    let allMembers = [];
+    let lastProfile = null;
+
+    async function api(path, opts) {
+      const res = await fetch(path, opts);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || ("Request failed: " + res.status));
+      return data;
+    }
+
+    function fillSelect(select, items, selectedId) {
+      select.innerHTML = "";
+      const placeholder = document.createElement("option");
+      placeholder.value = "";
+      placeholder.textContent = "— select —";
+      select.appendChild(placeholder);
+      for (const item of items) {
+        const opt = document.createElement("option");
+        opt.value = item.id;
+        opt.textContent = item.name;
+        if (String(item.id) === String(selectedId)) opt.selected = true;
+        select.appendChild(opt);
+      }
+    }
+
+    function nameOf(list, id) {
+      const found = list.find((x) => x.id === id);
+      return found ? found.name : "—";
+    }
+
+    function divisionNames(ids) {
+      if (!ids || !ids.length) return "—";
+      return ids.map((id) => nameOf(divisions, id)).join(", ");
+    }
+
+    function tagNames(ids) {
+      if (!ids || !ids.length) return "—";
+      return ids.map((id) => nameOf(tags, id)).join(", ");
+    }
+
+    // Fill a single-select used as a directory filter, with a leading "All" option.
+    function fillFilterSelect(select, items, allLabel) {
+      const current = select.value;
+      select.innerHTML = "";
+      const all = document.createElement("option");
+      all.value = "";
+      all.textContent = allLabel;
+      select.appendChild(all);
+      for (const item of items) {
+        const opt = document.createElement("option");
+        opt.value = item.id;
+        opt.textContent = item.name;
+        select.appendChild(opt);
+      }
+      select.value = current; // preserve selection across reloads
+    }
+
+    // Fill a <select multiple> and pre-select the given list of ids.
+    function fillMultiSelect(select, items, selectedIds) {
+      const selected = new Set((selectedIds || []).map((x) => String(x)));
+      select.innerHTML = "";
+      for (const item of items) {
+        const opt = document.createElement("option");
+        opt.value = item.id;
+        opt.textContent = item.name;
+        if (selected.has(String(item.id))) opt.selected = true;
+        select.appendChild(opt);
+      }
+    }
+
+    function selectedDivisionIds() {
+      return Array.from($("division_ids").selectedOptions).map((o) => Number(o.value));
+    }
+
+    function selectedTagIds() {
+      return Array.from($("tag_ids").selectedOptions).map((o) => Number(o.value));
+    }
+
+    async function loadLookups() {
+      [households, divisions, tags] = await Promise.all([
+        api("/households"),
+        api("/divisions"),
+        api("/tags"),
+      ]);
+      fillSelect($("household_id"), households, $("household_id").value);
+      fillSelect($("division_id"), divisions, $("division_id").value);
+      fillMultiSelect($("division_ids"), divisions, selectedDivisionIds());
+      fillMultiSelect($("tag_ids"), tags, selectedTagIds());
+      // Directory filter selects.
+      fillFilterSelect($("filter-household"), households, "All households");
+      fillFilterSelect($("filter-division"), divisions, "All divisions");
+      fillFilterSelect($("filter-tag"), tags, "All tags");
+    }
+
+    function currentFilterQuery() {
+      const params = new URLSearchParams();
+      const q = $("search-q").value.trim();
+      if (q) params.set("q", q);
+      if ($("filter-household").value) params.set("household_id", $("filter-household").value);
+      if ($("filter-status").value) params.set("status", $("filter-status").value);
+      if ($("filter-division").value) params.set("division_id", $("filter-division").value);
+      if ($("filter-tag").value) params.set("tag_id", $("filter-tag").value);
+      const qs = params.toString();
+      return qs ? `/members?${qs}` : "/members";
+    }
+
+    async function loadDirectory() {
+      const members = await api(currentFilterQuery());
+      const tbody = $("directory");
+      tbody.innerHTML = "";
+      if (!members.length) {
+        tbody.innerHTML = '<tr><td colspan="7">No members match — adjust the search or filters.</td></tr>';
+        return;
+      }
+      for (const m of members) {
+        const tr = document.createElement("tr");
+        tr.className = "clickable";
+        const statusClass = m.status === "active" ? "pill" : "pill inactive";
+        tr.innerHTML =
+          `<td>${m.first_name} ${m.last_name}</td>` +
+          `<td>${m.email || "—"}</td>` +
+          `<td>${m.phone || "—"}</td>` +
+          `<td><span class="${statusClass}">${m.status}</span></td>` +
+          `<td>${nameOf(households, m.household_id)}</td>` +
+          `<td>${divisionNames(m.division_ids)}</td>` +
+          `<td>${tagNames(m.tag_ids)}</td>`;
+        tr.addEventListener("click", () => showProfile(m));
+        tbody.appendChild(tr);
+      }
+    }
+
+    // --- Attendance (Story 2.1) ---
+    function setAttMsg(text, ok) {
+      const el = $("attendance-msg");
+      el.textContent = text || "";
+      el.className = "msg" + (text ? (ok ? " ok" : " error") : "");
+    }
+
+    async function loadAttendance() {
+      [services, allMembers] = await Promise.all([api("/services"), api("/members")]);
+      // Service select (most recent first by id).
+      const sel = $("attendance-service");
+      const current = sel.value;
+      sel.innerHTML = "";
+      if (!services.length) {
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = "— create a service first —";
+        sel.appendChild(opt);
+      }
+      for (const s of services) {
+        const opt = document.createElement("option");
+        opt.value = s.id;
+        opt.textContent = `${s.name} (${s.date})`;
+        sel.appendChild(opt);
+      }
+      // Restore the previous selection; if it no longer matches a real option
+      // (e.g. first load, where current === ""), fall back to the first service
+      // so a service is actually selected and the breakdown loads for it.
+      sel.value = current;
+      if (sel.selectedIndex < 0 && sel.options.length) {
+        sel.selectedIndex = 0;
+      }
+      // Member checklist.
+      const box = $("attendance-members");
+      box.innerHTML = "";
+      if (!allMembers.length) {
+        box.innerHTML = '<div class="hint">No members yet — add some first.</div>';
+        return;
+      }
+      for (const m of allMembers) {
+        const label = document.createElement("label");
+        label.innerHTML =
+          `<input type="checkbox" value="${m.id}" /> ${m.first_name} ${m.last_name}`;
+        box.appendChild(label);
+      }
+      await loadByDivision();
+    }
+
+    // Per-division breakdown for the selected service (Story 2.2).
+    async function loadByDivision() {
+      const box = $("attendance-by-division");
+      const serviceId = $("attendance-service").value;
+      box.innerHTML = "";
+      if (!serviceId) {
+        box.innerHTML = '<div class="hint">Select a service to see the breakdown.</div>';
+        return;
+      }
+      try {
+        const rows = await api(`/services/${serviceId}/attendance/by-division`);
+        if (!rows.length) {
+          box.innerHTML = '<div class="hint">No attendance recorded yet.</div>';
+          return;
+        }
+        for (const r of rows) {
+          const line = document.createElement("div");
+          line.textContent = `${r.division_name}: ${r.present}`;
+          box.appendChild(line);
+        }
+      } catch (err) {
+        box.innerHTML = `<div class="hint">${err.message}</div>`;
+      }
+    }
+
+    async function createService() {
+      const name = $("service-name").value.trim();
+      const date = $("service-date").value;
+      if (!name || !date) {
+        setAttMsg("Service name and date are required.", false);
+        return;
+      }
+      try {
+        const svc = await api("/services", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, date }),
+        });
+        $("service-name").value = "";
+        $("service-date").value = "";
+        await loadAttendance();
+        $("attendance-service").value = svc.id;
+        setAttMsg(`Service "${svc.name}" created.`, true);
+      } catch (err) {
+        setAttMsg(err.message, false);
+      }
+    }
+
+    async function saveAttendance() {
+      const serviceId = $("attendance-service").value;
+      if (!serviceId) {
+        setAttMsg("Select or create a service first.", false);
+        return;
+      }
+      const memberIds = Array.from(
+        $("attendance-members").querySelectorAll('input[type="checkbox"]:checked')
+      ).map((c) => Number(c.value));
+      if (!memberIds.length) {
+        setAttMsg("Check at least one member as present.", false);
+        return;
+      }
+      try {
+        const present = await api(`/services/${serviceId}/attendance`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ member_ids: memberIds }),
+        });
+        setAttMsg(`Attendance saved — ${present.length} present.`, true);
+        await loadByDivision();
+        if (lastProfile) await refreshProfileHistory();
+      } catch (err) {
+        setAttMsg(err.message, false);
+      }
+    }
+
+    async function refreshProfileHistory() {
+      if (!lastProfile) return;
+      try {
+        const history = await api(`/members/${lastProfile.id}/attendance`);
+        const text = history.length
+          ? history.map((h) => `${h.name} (${h.date})`).join(", ")
+          : "—";
+        const el = $("profile-attendance");
+        if (el) el.textContent = text;
+      } catch (err) {
+        /* non-fatal */
+      }
+    }
+
+    function showProfile(m) {
+      lastProfile = m;
+      $("profile-body").innerHTML =
+        `<dt>Name</dt><dd>${m.first_name} ${m.last_name}</dd>` +
+        `<dt>Email</dt><dd>${m.email || "—"}</dd>` +
+        `<dt>Phone</dt><dd>${m.phone || "—"}</dd>` +
+        `<dt>Status</dt><dd>${m.status}</dd>` +
+        `<dt>Household</dt><dd>${nameOf(households, m.household_id)}</dd>` +
+        `<dt>Primary division</dt><dd>${nameOf(divisions, m.division_id)}</dd>` +
+        `<dt>Divisions</dt><dd>${divisionNames(m.division_ids)}</dd>` +
+        `<dt>Tags</dt><dd>${tagNames(m.tag_ids)}</dd>` +
+        `<dt>Attendance</dt><dd id="profile-attendance">…</dd>`;
+      $("profile").hidden = false;
+      refreshProfileHistory();
+    }
+
+    function loadIntoForm(m) {
+      $("form-title").textContent = "Edit Member";
+      $("member-id").value = m.id;
+      $("first_name").value = m.first_name;
+      $("last_name").value = m.last_name;
+      $("email").value = m.email || "";
+      $("phone").value = m.phone || "";
+      $("status").value = m.status;
+      fillSelect($("household_id"), households, m.household_id);
+      fillSelect($("division_id"), divisions, m.division_id);
+      fillMultiSelect($("division_ids"), divisions, m.division_ids);
+      fillMultiSelect($("tag_ids"), tags, m.tag_ids);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function resetForm() {
+      $("form-title").textContent = "Add Member";
+      $("member-form").reset();
+      $("member-id").value = "";
+      $("form-msg").textContent = "";
+      $("form-msg").className = "msg";
+      fillSelect($("household_id"), households, "");
+      fillSelect($("division_id"), divisions, "");
+      fillMultiSelect($("division_ids"), divisions, []);
+      fillMultiSelect($("tag_ids"), tags, []);
+    }
+
+    function setMsg(text, ok) {
+      const el = $("form-msg");
+      el.textContent = text;
+      el.className = "msg " + (ok ? "ok" : "error");
+    }
+
+    async function submitForm(e) {
+      e.preventDefault();
+      const id = $("member-id").value;
+      const primaryDivision = $("division_id").value ? Number($("division_id").value) : null;
+      // The primary division is always part of the assignment set (AC #1).
+      const divisionIds = Array.from(
+        new Set([
+          ...(primaryDivision !== null ? [primaryDivision] : []),
+          ...selectedDivisionIds(),
+        ])
+      );
+      const payload = {
+        first_name: $("first_name").value.trim(),
+        last_name: $("last_name").value.trim(),
+        email: $("email").value.trim() || null,
+        phone: $("phone").value.trim() || null,
+        status: $("status").value,
+        household_id: $("household_id").value ? Number($("household_id").value) : null,
+        division_id: primaryDivision,
+        division_ids: divisionIds,
+        tag_ids: selectedTagIds(),
+      };
+      try {
+        const saved = id
+          ? await api(`/members/${id}`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            })
+          : await api("/members", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+        setMsg(id ? "Member updated." : "Member created.", true);
+        resetForm();
+        await loadDirectory();
+        await loadAttendance();
+        showProfile(saved);
+      } catch (err) {
+        setMsg(err.message, false);
+      }
+    }
+
+    async function quickAdd(path, name, listName) {
+      if (!name.trim()) return;
+      try {
+        await api(path, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: name.trim() }),
+        });
+        await loadLookups();
+        setMsg(`${listName} added.`, true);
+      } catch (err) {
+        setMsg(err.message, false);
+      }
+    }
+
+    $("member-form").addEventListener("submit", submitForm);
+    $("reset-btn").addEventListener("click", resetForm);
+    $("edit-btn").addEventListener("click", () => lastProfile && loadIntoForm(lastProfile));
+    $("add-household").addEventListener("click", () => {
+      quickAdd("/households", $("new-household").value, "Household").then(() => ($("new-household").value = ""));
+    });
+    $("add-division").addEventListener("click", () => {
+      quickAdd("/divisions", $("new-division").value, "Division").then(() => ($("new-division").value = ""));
+    });
+    $("add-tag").addEventListener("click", () => {
+      quickAdd("/tags", $("new-tag").value, "Tag").then(() => ($("new-tag").value = ""));
+    });
+    $("create-service").addEventListener("click", createService);
+    $("save-attendance").addEventListener("click", saveAttendance);
+    $("attendance-service").addEventListener("change", () =>
+      loadByDivision().catch((e) => setAttMsg(e.message, false))
+    );
+
+    // --- Directory search & filtering ---
+    let searchTimer = null;
+    function debouncedReload() {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => loadDirectory().catch((e) => setDirMsg(e.message)), 250);
+    }
+    function setDirMsg(text) {
+      $("dir-msg").textContent = text || "";
+      $("dir-msg").className = "msg" + (text ? " error" : "");
+    }
+    $("search-q").addEventListener("input", debouncedReload);
+    ["filter-household", "filter-status", "filter-division", "filter-tag"].forEach((id) => {
+      $(id).addEventListener("change", () => loadDirectory().catch((e) => setDirMsg(e.message)));
+    });
+    $("clear-filters").addEventListener("click", () => {
+      $("search-q").value = "";
+      $("filter-household").value = "";
+      $("filter-status").value = "";
+      $("filter-division").value = "";
+      $("filter-tag").value = "";
+      loadDirectory().catch((e) => setDirMsg(e.message));
+    });
+
+    (async () => {
+      try {
+        await loadLookups();
+        await loadDirectory();
+        await loadAttendance();
+      } catch (err) {
+        $("dir-msg").textContent = err.message;
+        $("dir-msg").className = "msg error";
+      }
+    })();
+  </script>
+</body>
+</html>

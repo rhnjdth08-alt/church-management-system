@@ -82,6 +82,47 @@ def test_update_member():
     assert updated["division_id"] == new_division_id
 
 
+def test_invalid_phone_rejected():
+    household_id = create_household(client)
+    division_id = create_division(client, "Adult Class")
+
+    response = client.post(
+        "/members",
+        json={
+            "first_name": "Invalid",
+            "last_name": "Phone",
+            "phone": "not-a-phone",
+            "household_id": household_id,
+            "division_id": division_id,
+        },
+    )
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Invalid phone format."
+
+
+def test_update_rejects_invalid_phone():
+    household_id = create_household(client)
+    division_id = create_division(client, "Youth Phone")
+    member_response = client.post(
+        "/members",
+        json={
+            "first_name": "Phone",
+            "last_name": "Updater",
+            "email": "phone.updater@example.com",
+            "household_id": household_id,
+            "division_id": division_id,
+        },
+    )
+    member_id = member_response.json()["id"]
+
+    update_response = client.put(
+        f"/members/{member_id}",
+        json={"phone": "call-me"},
+    )
+    assert update_response.status_code == 400
+    assert update_response.json()["detail"] == "Invalid phone format."
+
+
 def test_invalid_email_rejected():
     household_id = create_household(client)
     division_id = create_division(client, "Adult Class")

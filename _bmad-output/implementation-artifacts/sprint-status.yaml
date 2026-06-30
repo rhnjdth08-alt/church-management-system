@@ -8,11 +8,43 @@ epics:
     status: in-progress
     stories:
       - 1-1-create-and-update-member-records
+      - 1-2-assign-members-to-divisions
+      - 1-3-search-and-filter-the-directory
+  - id: epic-2
+    title: Attendance and Event Tracking
+    status: in-progress
+    stories:
+      - 2-1-record-attendance-for-services
+      - 2-2-track-attendance-by-division
 
 development_status:
   1-1-create-and-update-member-records:
-    status: ready-for-dev
+    status: review
     title: Create and update member records
     epic: 1
     story: 1
     file: _bmad-output/implementation-artifacts/1-1-create-and-update-member-records.md
+  1-2-assign-members-to-divisions:
+    status: review
+    title: Assign members to divisions
+    epic: 1
+    story: 2
+    file: _bmad-output/implementation-artifacts/1-2-assign-members-to-divisions.md
+  1-3-search-and-filter-the-directory:
+    status: review
+    title: Search and filter the directory
+    epic: 1
+    story: 3
+    file: _bmad-output/implementation-artifacts/1-3-search-and-filter-the-directory.md
+  2-1-record-attendance-for-services:
+    status: review
+    title: Record attendance for services
+    epic: 2
+    story: 1
+    file: _bmad-output/implementation-artifacts/2-1-record-attendance-for-services.md
+  2-2-track-attendance-by-division:
+    status: review
+    title: Track attendance by division
+    epic: 2
+    story: 2
+    file: _bmad-output/implementation-artifacts/2-2-track-attendance-by-division.md
