@@ -1,0 +1,18 @@
+project_name: Church Management System
+current_sprint: mvp
+status: active
+
+epics:
+  - id: epic-1
+    title: Member and Household Management
+    status: in-progress
+    stories:
+      - 1-1-create-and-update-member-records
+
+development_status:
+  1-1-create-and-update-member-records:
+    status: ready-for-dev
+    title: Create and update member records
+    epic: 1
+    story: 1
+    file: _bmad-output/implementation-artifacts/1-1-create-and-update-member-records.md

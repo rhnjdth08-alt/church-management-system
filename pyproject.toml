@@ -1,0 +1,23 @@
+[project]
+name = "church-management-system"
+version = "0.1.0"
+description = "Church Management System backend for member and ministry workflows."
+requires-python = ">=3.11"
+readme = "README.md"
+license = { text = "MIT" }
+classifiers = [
+    "Framework :: FastAPI",
+    "Programming Language :: Python :: 3.14",
+    "Operating System :: OS Independent"
+]
+dependencies = [
+    "fastapi>=0.105.0",
+    "uvicorn[standard]>=0.23.0",
+    "sqlmodel>=0.0.8",
+    "python-dotenv>=1.0",
+    "pytest>=8.3",
+    "httpx2>=0.31"
+]
+
+[project.scripts]
+run = "uvicorn app.main:app --reload"
