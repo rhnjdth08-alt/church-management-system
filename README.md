@@ -16,6 +16,13 @@ Run the app:
 C:/Users/Onwa/AppData/Local/Python/pythoncore-3.14-64/python.exe -m uvicorn app.main:app --reload
 ```
 
+Run tests:
+
+```powershell
+Set-Location 'C:\Users\Onwa\OneDrive\Documents\Church management system\backend'
+C:/Users/Onwa/AppData/Local/Python/pythoncore-3.14-64/python.exe -m pytest -q
+```
+
 ## Project structure
 
 - `backend/app` - FastAPI application source files
