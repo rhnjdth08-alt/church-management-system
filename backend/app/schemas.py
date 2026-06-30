@@ -208,3 +208,26 @@ class CampaignProgress(SQLModel):
     total_raised: float
     remaining: float
     percent_raised: float
+
+
+# --- Giving summaries (Story 3.3) ------------------------------------------
+
+
+class GivingByPeriod(SQLModel):
+    period: str  # "YYYY-MM"
+    total: float
+    count: int
+
+
+class GivingByDonor(SQLModel):
+    member_id: int
+    total: float
+    count: int
+
+
+class GivingSummary(SQLModel):
+    """Giving totals by period and donor, read from Donation data (AD-5)."""
+
+    grand_total: float
+    by_period: List[GivingByPeriod] = []
+    by_donor: List[GivingByDonor] = []

@@ -38,6 +38,9 @@ from .schemas import (
     EventCreate,
     EventRead,
     EventRSVPSummary,
+    GivingByDonor,
+    GivingByPeriod,
+    GivingSummary,
     HouseholdCreate,
     MemberCreate,
     MemberRead,
@@ -714,25 +717,26 @@ def list_pledges(*, session: Session = Depends(get_session), campaign_id: int):
     ).all()
 
 
-@app.get("/campaigns/{campaign_id}/progress", response_model=CampaignProgress)
-def campaign_progress(*, session: Session = Depends(get_session), campaign_id: int):
-    """Progress toward a campaign's target (AC #4)."""
-    campaign = session.get(FundraisingCampaign, campaign_id)
-    if not campaign:
-        raise HTTPException(status_code=404, detail="Campaign not found.")
-    pledges = session.exec(
-        select(Pledge).where(Pledge.campaign_id == campaign_id)
-    ).all()
-    contributions = session.exec(
-        select(Donation).where(Donation.campaign_id == campaign_id)
-    ).all()
-    total_pledged = sum(p.amount for p in pledges)
-    total_raised = sum(d.amount for d in contributions)
+def _campaign_progress(session: Session, campaign: FundraisingCampaign) -> CampaignProgress:
+    """Compute progress for one campaign (shared by the per-campaign and
+    all-campaigns progress endpoints)."""
+    total_pledged = sum(
+        p.amount
+        for p in session.exec(
+            select(Pledge).where(Pledge.campaign_id == campaign.id)
+        ).all()
+    )
+    total_raised = sum(
+        d.amount
+        for d in session.exec(
+            select(Donation).where(Donation.campaign_id == campaign.id)
+        ).all()
+    )
     remaining = max(campaign.target_amount - total_raised, 0.0)
     # target_amount is validated > 0 at creation, so this never divides by zero.
     percent_raised = total_raised / campaign.target_amount * 100
     return CampaignProgress(
-        campaign_id=campaign_id,
+        campaign_id=campaign.id,
         name=campaign.name,
         target=campaign.target_amount,
         total_pledged=total_pledged,
@@ -740,6 +744,59 @@ def campaign_progress(*, session: Session = Depends(get_session), campaign_id: i
         remaining=remaining,
         percent_raised=percent_raised,
     )
+
+
+@app.get("/campaigns/{campaign_id}/progress", response_model=CampaignProgress)
+def campaign_progress(*, session: Session = Depends(get_session), campaign_id: int):
+    """Progress toward a campaign's target (AC #4)."""
+    campaign = session.get(FundraisingCampaign, campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found.")
+    return _campaign_progress(session, campaign)
+
+
+# --- Giving summaries (Epic 3, Story 3.3) ----------------------------------
+
+
+@app.get("/giving/summary", response_model=GivingSummary)
+def giving_summary(*, session: Session = Depends(get_session)):
+    """Giving totals by period (YYYY-MM) and by donor, from Donation data (AC #1, AD-5)."""
+    donations = session.exec(select(Donation)).all()
+    grand_total = sum(d.amount for d in donations)
+
+    period_totals: dict[str, list] = {}  # period -> [total, count]
+    for d in donations:
+        period = d.date.strftime("%Y-%m")
+        bucket = period_totals.setdefault(period, [0.0, 0])
+        bucket[0] += d.amount
+        bucket[1] += 1
+    by_period = [
+        GivingByPeriod(period=period, total=total, count=count)
+        for period, (total, count) in sorted(period_totals.items())
+    ]
+
+    donor_totals: dict[int, list] = {}  # member_id -> [total, count]
+    for d in donations:
+        if d.member_id is None:
+            continue  # household-only gifts count in totals, not per-donor
+        bucket = donor_totals.setdefault(d.member_id, [0.0, 0])
+        bucket[0] += d.amount
+        bucket[1] += 1
+    by_donor = [
+        GivingByDonor(member_id=member_id, total=total, count=count)
+        for member_id, (total, count) in sorted(donor_totals.items())
+    ]
+
+    return GivingSummary(
+        grand_total=grand_total, by_period=by_period, by_donor=by_donor
+    )
+
+
+@app.get("/giving/campaigns/progress", response_model=list[CampaignProgress])
+def all_campaigns_progress(*, session: Session = Depends(get_session)):
+    """Progress for every fundraising campaign, shown alongside giving (AC #3)."""
+    campaigns = session.exec(select(FundraisingCampaign)).all()
+    return [_campaign_progress(session, c) for c in campaigns]
 
 
 @app.get("/", include_in_schema=False)

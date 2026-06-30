@@ -246,6 +246,21 @@
         <div class="msg" id="fundraising-msg"></div>
       </div>
 
+      <div class="card" id="summary-panel">
+        <h2>Giving Summary</h2>
+        <div class="actions">
+          <button type="button" class="ghost" id="refresh-summary">Refresh summary</button>
+        </div>
+        <div id="summary-total" class="hint"></div>
+        <label>By month</label>
+        <div id="summary-period" class="checklist"></div>
+        <label>Top donors</label>
+        <div id="summary-donors" class="checklist"></div>
+        <label>Campaign progress</label>
+        <div id="summary-campaigns" class="checklist"></div>
+        <div class="msg" id="summary-msg"></div>
+      </div>
+
       <div class="card">
         <h2>Directory</h2>
         <div class="filters">
@@ -851,6 +866,60 @@
       }
     }
 
+    // --- Giving Summary (Story 3.3) ---
+    async function loadSummary() {
+      const msg = $("summary-msg");
+      msg.textContent = "";
+      msg.className = "msg";
+      try {
+        const [summary, campaignProgress] = await Promise.all([
+          api("/giving/summary"),
+          api("/giving/campaigns/progress"),
+        ]);
+        $("summary-total").textContent =
+          `Grand total: ${summary.grand_total.toFixed(2)}`;
+
+        const periodBox = $("summary-period");
+        periodBox.innerHTML = summary.by_period.length
+          ? ""
+          : '<div class="hint">No donations yet.</div>';
+        for (const p of summary.by_period) {
+          const line = document.createElement("div");
+          line.textContent = `${p.period}: ${p.total.toFixed(2)} (${p.count})`;
+          periodBox.appendChild(line);
+        }
+
+        const donorBox = $("summary-donors");
+        // Show donors by descending total, top 10.
+        const donors = summary.by_donor
+          .slice()
+          .sort((a, b) => b.total - a.total)
+          .slice(0, 10);
+        donorBox.innerHTML = donors.length
+          ? ""
+          : '<div class="hint">No member-attributed gifts.</div>';
+        for (const d of donors) {
+          const line = document.createElement("div");
+          line.textContent = `${memberLabel(d.member_id)}: ${d.total.toFixed(2)} (${d.count})`;
+          donorBox.appendChild(line);
+        }
+
+        const campBox = $("summary-campaigns");
+        campBox.innerHTML = campaignProgress.length
+          ? ""
+          : '<div class="hint">No campaigns yet.</div>';
+        for (const c of campaignProgress) {
+          const line = document.createElement("div");
+          line.textContent =
+            `${c.name}: ${c.total_raised.toFixed(2)} / ${c.target.toFixed(2)} (${c.percent_raised.toFixed(1)}%)`;
+          campBox.appendChild(line);
+        }
+      } catch (err) {
+        msg.textContent = err.message;
+        msg.className = "msg error";
+      }
+    }
+
     function showProfile(m) {
       lastProfile = m;
       $("profile-body").innerHTML =
@@ -986,6 +1055,7 @@
     $("pledge-campaign").addEventListener("change", () =>
       loadProgress().catch((e) => setFundMsg(e.message, false))
     );
+    $("refresh-summary").addEventListener("click", loadSummary);
 
     // --- Directory search & filtering ---
     let searchTimer = null;
@@ -1018,6 +1088,7 @@
         await loadEvents();
         await loadGiving();
         await loadFundraising();
+        await loadSummary();
       } catch (err) {
         $("dir-msg").textContent = err.message;
         $("dir-msg").className = "msg error";

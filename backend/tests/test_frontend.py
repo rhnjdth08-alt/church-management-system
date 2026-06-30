@@ -76,3 +76,9 @@ def test_fundraising_ui_controls_present():
     assert 'id="fundraising-panel"' in body
     assert 'id="campaign-name"' in body
     assert 'id="campaign-target"' in body
+
+
+def test_giving_summary_ui_present():
+    """The UI must surface a giving summary (Story 3.3)."""
+    body = client.get("/").text
+    assert 'id="summary-panel"' in body

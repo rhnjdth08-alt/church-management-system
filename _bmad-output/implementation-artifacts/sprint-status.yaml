@@ -82,7 +82,7 @@ development_status:
     story: 2
     file: _bmad-output/implementation-artifacts/3-2-track-building-fundraising-campaigns.md
   3-3-review-giving-summaries:
-    status: ready-for-dev
+    status: review
     title: Review giving summaries
     epic: 3
     story: 3
