@@ -260,3 +260,27 @@ class AnnouncementRead(SQLModel):
 
 class RecipientCount(SQLModel):
     recipient_count: int
+
+
+# --- Dashboard (Story 4.2) -------------------------------------------------
+
+
+class ServiceAttendanceCount(SQLModel):
+    service_id: int
+    name: str
+    date: date
+    present: int
+
+
+class DashboardSummary(SQLModel):
+    """Headline metrics + trends, all from the shared data model (AD-5)."""
+
+    member_count: int
+    service_count: int
+    attendance_count: int
+    event_count: int
+    campaign_count: int
+    total_giving: float
+    giving_by_period: List[GivingByPeriod] = []
+    attendance_by_service: List[ServiceAttendanceCount] = []
+    campaigns: List[CampaignProgress] = []

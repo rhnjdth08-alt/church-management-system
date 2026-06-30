@@ -33,6 +33,7 @@ from .schemas import (
     CampaignCreate,
     CampaignProgress,
     CampaignRead,
+    DashboardSummary,
     DivisionAttendanceCount,
     DivisionAttendanceSummaryEntry,
     DivisionCreate,
@@ -53,6 +54,7 @@ from .schemas import (
     RecipientCount,
     RSVPCreate,
     RSVPRead,
+    ServiceAttendanceCount,
     ServiceCreate,
     ServiceRead,
     TagCreate,
@@ -780,22 +782,27 @@ def campaign_progress(*, session: Session = Depends(get_session), campaign_id: i
 # --- Giving summaries (Epic 3, Story 3.3) ----------------------------------
 
 
+def _giving_by_period(session: Session) -> list[GivingByPeriod]:
+    """Giving totals grouped by month (YYYY-MM), ascending. Shared by the giving
+    summary (3.3) and the dashboard (4.2)."""
+    period_totals: dict[str, list] = {}  # period -> [total, count]
+    for d in session.exec(select(Donation)).all():
+        period = d.date.strftime("%Y-%m")
+        bucket = period_totals.setdefault(period, [0.0, 0])
+        bucket[0] += d.amount
+        bucket[1] += 1
+    return [
+        GivingByPeriod(period=period, total=total, count=count)
+        for period, (total, count) in sorted(period_totals.items())
+    ]
+
+
 @app.get("/giving/summary", response_model=GivingSummary)
 def giving_summary(*, session: Session = Depends(get_session)):
     """Giving totals by period (YYYY-MM) and by donor, from Donation data (AC #1, AD-5)."""
     donations = session.exec(select(Donation)).all()
     grand_total = sum(d.amount for d in donations)
-
-    period_totals: dict[str, list] = {}  # period -> [total, count]
-    for d in donations:
-        period = d.date.strftime("%Y-%m")
-        bucket = period_totals.setdefault(period, [0.0, 0])
-        bucket[0] += d.amount
-        bucket[1] += 1
-    by_period = [
-        GivingByPeriod(period=period, total=total, count=count)
-        for period, (total, count) in sorted(period_totals.items())
-    ]
+    by_period = _giving_by_period(session)
 
     donor_totals: dict[int, list] = {}  # member_id -> [total, count]
     for d in donations:
@@ -909,6 +916,41 @@ def preview_announcement_audience(
             household_id=household_id,
             status=status,
         )
+    )
+
+
+# --- Dashboard (Epic 4, Story 4.2) -----------------------------------------
+
+
+@app.get("/dashboard", response_model=DashboardSummary)
+def dashboard(*, session: Session = Depends(get_session)):
+    """Headline metrics and trends, all from the shared data model (AC #1-#4)."""
+    members = session.exec(select(Member)).all()
+    services = session.exec(select(Service)).all()
+    attendance = session.exec(select(AttendanceRecord)).all()
+    events = session.exec(select(Event)).all()
+    campaigns = session.exec(select(FundraisingCampaign)).all()
+    donations = session.exec(select(Donation)).all()
+
+    attendance_by_service = []
+    for s in services:
+        present = len(_present_members(session, s.id))
+        attendance_by_service.append(
+            ServiceAttendanceCount(
+                service_id=s.id, name=s.name, date=s.date, present=present
+            )
+        )
+
+    return DashboardSummary(
+        member_count=len(members),
+        service_count=len(services),
+        attendance_count=len(attendance),
+        event_count=len(events),
+        campaign_count=len(campaigns),
+        total_giving=sum(d.amount for d in donations),
+        giving_by_period=_giving_by_period(session),
+        attendance_by_service=attendance_by_service,
+        campaigns=[_campaign_progress(session, c) for c in campaigns],
     )
 
 

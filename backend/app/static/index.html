@@ -292,6 +292,21 @@
         <div id="announcement-log" class="checklist"></div>
       </div>
 
+      <div class="card" id="dashboard-panel">
+        <h2>Dashboard</h2>
+        <div class="actions">
+          <button type="button" class="ghost" id="refresh-dashboard">Refresh dashboard</button>
+        </div>
+        <div id="dashboard-metrics" class="checklist"></div>
+        <label>Attendance by service</label>
+        <div id="dashboard-attendance" class="checklist"></div>
+        <label>Giving by month</label>
+        <div id="dashboard-giving" class="checklist"></div>
+        <label>Campaign progress</label>
+        <div id="dashboard-campaigns" class="checklist"></div>
+        <div class="msg" id="dashboard-msg"></div>
+      </div>
+
       <div class="card">
         <h2>Directory</h2>
         <div class="filters">
@@ -1038,6 +1053,52 @@
       }
     }
 
+    // --- Dashboard (Story 4.2) ---
+    async function loadDashboard() {
+      const msg = $("dashboard-msg");
+      msg.textContent = "";
+      msg.className = "msg";
+      try {
+        const d = await api("/dashboard");
+        const metrics = [
+          ["Members", d.member_count],
+          ["Services", d.service_count],
+          ["Attendance records", d.attendance_count],
+          ["Events", d.event_count],
+          ["Campaigns", d.campaign_count],
+          ["Total giving", d.total_giving.toFixed(2)],
+        ];
+        const mBox = $("dashboard-metrics");
+        mBox.innerHTML = "";
+        for (const [label, value] of metrics) {
+          const line = document.createElement("div");
+          line.textContent = `${label}: ${value}`;
+          mBox.appendChild(line);
+        }
+
+        renderList("dashboard-attendance", d.attendance_by_service,
+          (s) => `${s.name} (${s.date}): ${s.present} present`, "No services yet.");
+        renderList("dashboard-giving", d.giving_by_period,
+          (p) => `${p.period}: ${p.total.toFixed(2)} (${p.count})`, "No giving yet.");
+        renderList("dashboard-campaigns", d.campaigns,
+          (c) => `${c.name}: ${c.total_raised.toFixed(2)} / ${c.target.toFixed(2)} (${c.percent_raised.toFixed(1)}%)`,
+          "No campaigns yet.");
+      } catch (err) {
+        msg.textContent = err.message;
+        msg.className = "msg error";
+      }
+    }
+
+    function renderList(boxId, items, fmt, emptyText) {
+      const box = $(boxId);
+      box.innerHTML = items.length ? "" : `<div class="hint">${emptyText}</div>`;
+      for (const item of items) {
+        const line = document.createElement("div");
+        line.textContent = fmt(item);
+        box.appendChild(line);
+      }
+    }
+
     function showProfile(m) {
       lastProfile = m;
       $("profile-body").innerHTML =
@@ -1175,6 +1236,7 @@
     );
     $("refresh-summary").addEventListener("click", loadSummary);
     $("send-announcement").addEventListener("click", sendAnnouncement);
+    $("refresh-dashboard").addEventListener("click", loadDashboard);
     ["announcement-division", "announcement-tag", "announcement-household"].forEach((id) => {
       $(id).addEventListener("change", () =>
         previewAudience().catch((e) => setAnnMsg(e.message, false))
@@ -1214,6 +1276,7 @@
         await loadFundraising();
         await loadSummary();
         await loadAnnouncements();
+        await loadDashboard();
       } catch (err) {
         $("dir-msg").textContent = err.message;
         $("dir-msg").className = "msg error";

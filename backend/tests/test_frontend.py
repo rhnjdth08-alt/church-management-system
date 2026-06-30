@@ -90,3 +90,9 @@ def test_announcements_ui_present():
     assert 'id="announcements-panel"' in body
     assert 'id="announcement-subject"' in body
     assert 'id="announcement-body"' in body
+
+
+def test_dashboard_ui_present():
+    """The UI must surface a dashboard (Story 4.2)."""
+    body = client.get("/").text
+    assert 'id="dashboard-panel"' in body

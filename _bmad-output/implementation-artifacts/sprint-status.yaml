@@ -94,7 +94,7 @@ development_status:
     story: 1
     file: _bmad-output/implementation-artifacts/4-1-send-targeted-announcements.md
   4-2-provide-basic-dashboards:
-    status: ready-for-dev
+    status: review
     title: Provide basic dashboards
     epic: 4
     story: 2
