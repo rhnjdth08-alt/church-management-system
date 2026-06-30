@@ -20,6 +20,9 @@
     button { cursor: pointer; border: none; border-radius: 6px; padding: 9px 14px; font-size: 14px; }
     .primary { background: var(--accent); color: #fff; }
     .ghost { background: #eef1f5; color: #1f2933; }
+    .ghost.danger { background: #fbe5e5; color: #b00020; padding: 2px 8px; line-height: 1; }
+    .ghost.danger:hover { background: #f5cccc; }
+    .manage-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 0; }
     .actions { margin-top: 14px; display: flex; gap: 10px; }
     table { width: 100%; border-collapse: collapse; font-size: 14px; }
     th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--border); }
@@ -73,12 +76,10 @@
           <option value="inactive">inactive</option>
         </select>
 
-        <label for="household_id">Household *</label>
-        <select id="household_id" required></select>
-        <div class="inline-add">
-          <input id="new-household" placeholder="New household name" />
-          <button type="button" class="ghost" id="add-household">+ Add</button>
-        </div>
+        <label for="household_name">Household</label>
+        <input id="household_name" list="household-options" placeholder="Type a household name (new ones are created automatically)" autocomplete="off" />
+        <datalist id="household-options"></datalist>
+        <div class="hint">Start typing to reuse an existing household, or enter a new name to create one.</div>
 
         <label for="division_id">Primary division *</label>
         <select id="division_id" required></select>
@@ -91,12 +92,10 @@
         <select id="division_ids" multiple size="4"></select>
         <div class="hint">Hold Ctrl (or Cmd) to select multiple. The primary division is always included.</div>
 
-        <label for="tag_ids">Ministry tags (optional)</label>
-        <select id="tag_ids" multiple size="4"></select>
-        <div class="inline-add">
-          <input id="new-tag" placeholder="New tag name" />
-          <button type="button" class="ghost" id="add-tag">+ Add</button>
-        </div>
+        <label for="tags_text">Ministry tags (optional)</label>
+        <input id="tags_text" list="tag-options" placeholder="e.g. Choir, Ushers, Youth" autocomplete="off" />
+        <datalist id="tag-options"></datalist>
+        <div class="hint">Separate multiple tags with commas. New tags are created automatically.</div>
 
         <div class="actions">
           <button type="submit" class="primary" id="save-btn">Save Member</button>
@@ -329,11 +328,21 @@
         </div>
         <table>
           <thead>
-            <tr><th>Name</th><th>Email</th><th>Phone</th><th>Status</th><th>Household</th><th>Divisions</th><th>Tags</th></tr>
+            <tr><th>Name</th><th>Email</th><th>Phone</th><th>Status</th><th>Household</th><th>Divisions</th><th>Tags</th><th></th></tr>
           </thead>
           <tbody id="directory"></tbody>
         </table>
         <div class="msg" id="dir-msg"></div>
+      </div>
+
+      <div class="card" id="manage-panel">
+        <h2>Manage households &amp; tags</h2>
+        <div class="hint">Deleting a household or tag removes it from members but never deletes the members themselves or their giving history.</div>
+        <label>Households</label>
+        <div id="manage-households" class="checklist"></div>
+        <label>Ministry tags</label>
+        <div id="manage-tags" class="checklist"></div>
+        <div class="msg" id="manage-msg"></div>
       </div>
     </section>
   </main>
@@ -408,6 +417,16 @@
       select.value = current; // preserve selection across reloads
     }
 
+    // Fill a <datalist> with one <option> per item name, for free-text autocomplete.
+    function fillDatalist(list, items) {
+      list.innerHTML = "";
+      for (const item of items) {
+        const opt = document.createElement("option");
+        opt.value = item.name;
+        list.appendChild(opt);
+      }
+    }
+
     // Fill a <select multiple> and pre-select the given list of ids.
     function fillMultiSelect(select, items, selectedIds) {
       const selected = new Set((selectedIds || []).map((x) => String(x)));
@@ -425,8 +444,40 @@
       return Array.from($("division_ids").selectedOptions).map((o) => Number(o.value));
     }
 
-    function selectedTagIds() {
-      return Array.from($("tag_ids").selectedOptions).map((o) => Number(o.value));
+    // Find an existing lookup item by name (case-insensitive), or create it via POST.
+    // Returns the item's id. `list` is the in-memory cache (households or tags).
+    async function findOrCreate(path, list, name) {
+      const trimmed = name.trim();
+      if (!trimmed) return null;
+      const existing = list.find(
+        (x) => x.name.trim().toLowerCase() === trimmed.toLowerCase()
+      );
+      if (existing) return existing.id;
+      const created = await api(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmed }),
+      });
+      list.push(created); // keep cache fresh so a repeated name isn't created twice
+      return created.id;
+    }
+
+    // Resolve the comma-separated tag text box into a list of tag ids,
+    // creating any tags that don't exist yet.
+    async function resolveTagIds() {
+      const names = $("tags_text").value
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const seen = new Set();
+      const ids = [];
+      for (const name of names) {
+        const key = name.toLowerCase();
+        if (seen.has(key)) continue; // ignore duplicates typed in the same box
+        seen.add(key);
+        ids.push(await findOrCreate("/tags", tags, name));
+      }
+      return ids;
     }
 
     async function loadLookups() {
@@ -435,14 +486,57 @@
         api("/divisions"),
         api("/tags"),
       ]);
-      fillSelect($("household_id"), households, $("household_id").value);
+      fillDatalist($("household-options"), households);
+      fillDatalist($("tag-options"), tags);
       fillSelect($("division_id"), divisions, $("division_id").value);
       fillMultiSelect($("division_ids"), divisions, selectedDivisionIds());
-      fillMultiSelect($("tag_ids"), tags, selectedTagIds());
       // Directory filter selects.
       fillFilterSelect($("filter-household"), households, "All households");
       fillFilterSelect($("filter-division"), divisions, "All divisions");
       fillFilterSelect($("filter-tag"), tags, "All tags");
+      renderManageLists();
+    }
+
+    function setManageMsg(text, ok) {
+      const el = $("manage-msg");
+      el.textContent = text || "";
+      el.className = "msg" + (text ? (ok ? " ok" : " error") : "");
+    }
+
+    // Render the delete-able lists of households and tags. Deleting one refreshes
+    // every dependent view (lookups, directory) since members may detach from it.
+    function renderManageLists() {
+      const build = (boxId, items, path, label) => {
+        const box = $(boxId);
+        box.innerHTML = items.length ? "" : `<div class="hint">No ${label}s yet.</div>`;
+        for (const item of items) {
+          const row = document.createElement("div");
+          row.className = "manage-row";
+          const name = document.createElement("span");
+          name.textContent = item.name;
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "ghost danger";
+          btn.textContent = "✕";
+          btn.title = `Delete ${label}`;
+          btn.addEventListener("click", async () => {
+            if (!confirm(`Delete ${label} "${item.name}"? It will be removed from any members that have it.`)) return;
+            try {
+              await api(`${path}/${item.id}`, { method: "DELETE" });
+              await loadLookups();
+              await loadDirectory();
+              setManageMsg(`${label[0].toUpperCase() + label.slice(1)} "${item.name}" deleted.`, true);
+            } catch (err) {
+              setManageMsg(err.message, false);
+            }
+          });
+          row.appendChild(name);
+          row.appendChild(btn);
+          box.appendChild(row);
+        }
+      };
+      build("manage-households", households, "/households", "household");
+      build("manage-tags", tags, "/tags", "tag");
     }
 
     function currentFilterQuery() {
@@ -462,7 +556,7 @@
       const tbody = $("directory");
       tbody.innerHTML = "";
       if (!members.length) {
-        tbody.innerHTML = '<tr><td colspan="7">No members match — adjust the search or filters.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8">No members match — adjust the search or filters.</td></tr>';
         return;
       }
       for (const m of members) {
@@ -476,8 +570,24 @@
           `<td><span class="${statusClass}">${esc(m.status)}</span></td>` +
           `<td>${esc(nameOf(households, m.household_id))}</td>` +
           `<td>${esc(divisionNames(m.division_ids))}</td>` +
-          `<td>${esc(tagNames(m.tag_ids))}</td>`;
+          `<td>${esc(tagNames(m.tag_ids))}</td>` +
+          `<td><button type="button" class="ghost danger" title="Delete member">✕</button></td>`;
         tr.addEventListener("click", () => showProfile(m));
+        // The delete button lives inside the row; stop the click from also
+        // opening the profile, and confirm before removing.
+        tr.querySelector("button").addEventListener("click", async (ev) => {
+          ev.stopPropagation();
+          if (!confirm(`Delete ${m.first_name} ${m.last_name}? This cannot be undone.`)) return;
+          try {
+            await api(`/members/${m.id}`, { method: "DELETE" });
+            if (lastProfile && lastProfile.id === m.id) $("profile").hidden = true;
+            await loadDirectory();
+            await loadAttendance();
+            setDirMsg(`${m.first_name} ${m.last_name} deleted.`, true);
+          } catch (err) {
+            setDirMsg(err.message, false);
+          }
+        });
         tbody.appendChild(tr);
       }
     }
@@ -1135,10 +1245,10 @@
       $("email").value = m.email || "";
       $("phone").value = m.phone || "";
       $("status").value = m.status;
-      fillSelect($("household_id"), households, m.household_id);
+      $("household_name").value = m.household_id ? nameOf(households, m.household_id) : "";
       fillSelect($("division_id"), divisions, m.division_id);
       fillMultiSelect($("division_ids"), divisions, m.division_ids);
-      fillMultiSelect($("tag_ids"), tags, m.tag_ids);
+      $("tags_text").value = (m.tag_ids || []).map((id) => nameOf(tags, id)).join(", ");
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
@@ -1148,10 +1258,10 @@
       $("member-id").value = "";
       $("form-msg").textContent = "";
       $("form-msg").className = "msg";
-      fillSelect($("household_id"), households, "");
+      $("household_name").value = "";
       fillSelect($("division_id"), divisions, "");
       fillMultiSelect($("division_ids"), divisions, []);
-      fillMultiSelect($("tag_ids"), tags, []);
+      $("tags_text").value = "";
     }
 
     function setMsg(text, ok) {
@@ -1171,18 +1281,28 @@
           ...selectedDivisionIds(),
         ])
       );
-      const payload = {
-        first_name: $("first_name").value.trim(),
-        last_name: $("last_name").value.trim(),
-        email: $("email").value.trim() || null,
-        phone: $("phone").value.trim() || null,
-        status: $("status").value,
-        household_id: $("household_id").value ? Number($("household_id").value) : null,
-        division_id: primaryDivision,
-        division_ids: divisionIds,
-        tag_ids: selectedTagIds(),
-      };
       try {
+        // Resolve free-typed household and tag names into ids, creating any new ones.
+        const householdId = await findOrCreate(
+          "/households",
+          households,
+          $("household_name").value
+        );
+        const tagIds = await resolveTagIds();
+        // Refresh datalists so newly created names show up as suggestions next time.
+        fillDatalist($("household-options"), households);
+        fillDatalist($("tag-options"), tags);
+        const payload = {
+          first_name: $("first_name").value.trim(),
+          last_name: $("last_name").value.trim(),
+          email: $("email").value.trim() || null,
+          phone: $("phone").value.trim() || null,
+          status: $("status").value,
+          household_id: householdId,
+          division_id: primaryDivision,
+          division_ids: divisionIds,
+          tag_ids: tagIds,
+        };
         const saved = id
           ? await api(`/members/${id}`, {
               method: "PUT",
@@ -1222,14 +1342,8 @@
     $("member-form").addEventListener("submit", submitForm);
     $("reset-btn").addEventListener("click", resetForm);
     $("edit-btn").addEventListener("click", () => lastProfile && loadIntoForm(lastProfile));
-    $("add-household").addEventListener("click", () => {
-      quickAdd("/households", $("new-household").value, "Household").then(() => ($("new-household").value = ""));
-    });
     $("add-division").addEventListener("click", () => {
       quickAdd("/divisions", $("new-division").value, "Division").then(() => ($("new-division").value = ""));
-    });
-    $("add-tag").addEventListener("click", () => {
-      quickAdd("/tags", $("new-tag").value, "Tag").then(() => ($("new-tag").value = ""));
     });
     $("create-service").addEventListener("click", createService);
     $("save-attendance").addEventListener("click", saveAttendance);
@@ -1261,9 +1375,11 @@
       clearTimeout(searchTimer);
       searchTimer = setTimeout(() => loadDirectory().catch((e) => setDirMsg(e.message)), 250);
     }
-    function setDirMsg(text) {
+    // `ok` defaults to false so existing callers (which pass only an error
+    // string) still render in the error style.
+    function setDirMsg(text, ok = false) {
       $("dir-msg").textContent = text || "";
-      $("dir-msg").className = "msg" + (text ? " error" : "");
+      $("dir-msg").className = "msg" + (text ? (ok ? " ok" : " error") : "");
     }
     $("search-q").addEventListener("input", debouncedReload);
     ["filter-household", "filter-status", "filter-division", "filter-tag"].forEach((id) => {

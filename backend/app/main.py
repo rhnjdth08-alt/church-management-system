@@ -185,6 +185,39 @@ def list_households(*, session: Session = Depends(get_session)):
     return session.exec(select(Household)).all()
 
 
+@app.delete("/households/{household_id}", status_code=204)
+def delete_household(*, session: Session = Depends(get_session), household_id: int):
+    """Delete a household. Members in it (and any donations/pledges/announcements
+    that reference it) are detached — their ``household_id`` is nulled — rather
+    than deleted, so no member or financial record is lost."""
+    household = session.get(Household, household_id)
+    if not household:
+        raise HTTPException(status_code=404, detail="Household not found.")
+    for member in session.exec(
+        select(Member).where(Member.household_id == household_id)
+    ).all():
+        member.household_id = None
+        session.add(member)
+    for donation in session.exec(
+        select(Donation).where(Donation.household_id == household_id)
+    ).all():
+        donation.household_id = None
+        session.add(donation)
+    for pledge in session.exec(
+        select(Pledge).where(Pledge.household_id == household_id)
+    ).all():
+        pledge.household_id = None
+        session.add(pledge)
+    for ann in session.exec(
+        select(Announcement).where(Announcement.household_id == household_id)
+    ).all():
+        ann.household_id = None
+        session.add(ann)
+    session.delete(household)
+    session.commit()
+    return Response(status_code=204)
+
+
 @app.post("/divisions", response_model=Division)
 def create_division(*, session: Session = Depends(get_session), division: DivisionCreate):
     db_division = Division.model_validate(division)
@@ -211,6 +244,27 @@ def create_tag(*, session: Session = Depends(get_session), tag: TagCreate):
 @app.get("/tags", response_model=list[Tag])
 def list_tags(*, session: Session = Depends(get_session)):
     return session.exec(select(Tag)).all()
+
+
+@app.delete("/tags/{tag_id}", status_code=204)
+def delete_tag(*, session: Session = Depends(get_session), tag_id: int):
+    """Delete a ministry tag. It is removed from every member that has it, and
+    any announcement targeting it is detached (``tag_id`` nulled)."""
+    tag = session.get(Tag, tag_id)
+    if not tag:
+        raise HTTPException(status_code=404, detail="Tag not found.")
+    for link in session.exec(
+        select(MemberTagLink).where(MemberTagLink.tag_id == tag_id)
+    ).all():
+        session.delete(link)
+    for ann in session.exec(
+        select(Announcement).where(Announcement.tag_id == tag_id)
+    ).all():
+        ann.tag_id = None
+        session.add(ann)
+    session.delete(tag)
+    session.commit()
+    return Response(status_code=204)
 
 
 @app.post("/members", response_model=MemberRead)
@@ -302,6 +356,48 @@ def update_member(*, session: Session = Depends(get_session), member_id: int, me
     session.commit()
     session.refresh(db_member)
     return _to_read(db_member)
+
+
+@app.delete("/members/{member_id}", status_code=204)
+def delete_member(*, session: Session = Depends(get_session), member_id: int):
+    """Delete a member and everything that belongs only to them.
+
+    Division/tag links, attendance, and RSVPs are removed. Donations and pledges
+    are kept for giving-history integrity, but detached from the member (their
+    ``member_id`` is nulled) so the financial record survives the deletion.
+    """
+    member = session.get(Member, member_id)
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found.")
+    for link in session.exec(
+        select(MemberDivisionLink).where(MemberDivisionLink.member_id == member_id)
+    ).all():
+        session.delete(link)
+    for link in session.exec(
+        select(MemberTagLink).where(MemberTagLink.member_id == member_id)
+    ).all():
+        session.delete(link)
+    for record in session.exec(
+        select(AttendanceRecord).where(AttendanceRecord.member_id == member_id)
+    ).all():
+        session.delete(record)
+    for rsvp in session.exec(
+        select(EventRSVP).where(EventRSVP.member_id == member_id)
+    ).all():
+        session.delete(rsvp)
+    for donation in session.exec(
+        select(Donation).where(Donation.member_id == member_id)
+    ).all():
+        donation.member_id = None
+        session.add(donation)
+    for pledge in session.exec(
+        select(Pledge).where(Pledge.member_id == member_id)
+    ).all():
+        pledge.member_id = None
+        session.add(pledge)
+    session.delete(member)
+    session.commit()
+    return Response(status_code=204)
 
 
 def _filter_members(

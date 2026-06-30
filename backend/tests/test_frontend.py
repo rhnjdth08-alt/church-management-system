@@ -35,9 +35,21 @@ def test_directory_has_search_and_filter_controls():
 
 
 def test_member_form_supports_tags():
-    """The member form must allow assigning ministry tags (Story 1.3)."""
+    """The member form must allow assigning ministry tags (Story 1.3).
+
+    Tags are entered as free text (comma-separated); new tags are created
+    automatically on save, and existing tags are offered via a datalist.
+    """
     body = client.get("/").text
-    assert 'id="tag_ids"' in body
+    assert 'id="tags_text"' in body
+    assert 'id="tag-options"' in body  # autocomplete datalist of existing tags
+
+
+def test_member_form_supports_freetext_household():
+    """The member form must let an admin type a household name freely (auto-created)."""
+    body = client.get("/").text
+    assert 'id="household_name"' in body
+    assert 'id="household-options"' in body  # autocomplete datalist of existing households
 
 
 def test_attendance_ui_controls_present():
