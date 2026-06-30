@@ -104,3 +104,4 @@ claude-opus-4-8[1m]
 ## Change Log
 
 - 2026-06-30: Implemented Story 2.3 (Manage event RSVPs). Added the Events Module — `Event` + `EventRSVP` (unique per member+event for idempotent RSVP), `POST/GET /events`, RSVP upsert with yes/no/total summary, and an Events & RSVPs UI card. 11 tests added (74 passing). Status → review.
+- 2026-06-30: Code review fix (UI, codebase-wide) — the RSVP row rendered member names via `innerHTML` unescaped (stored-XSS vector if a member is named e.g. `<img onerror=…>`). Added a shared `esc()` HTML-escape helper and applied it at every `innerHTML` interpolation of user data (RSVP rows, directory table, attendance checklist, member profile) and to error messages. Data-line renderers already used `textContent`.

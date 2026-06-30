@@ -340,6 +340,12 @@
 
   <script>
     const $ = (id) => document.getElementById(id);
+    // Escape text before interpolating into innerHTML so member names, error
+    // messages, etc. can never inject markup/script (stored XSS).
+    const esc = (s) =>
+      String(s ?? "").replace(/[&<>"']/g, (c) =>
+        ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
+      );
     let households = [];
     let divisions = [];
     let tags = [];
@@ -464,13 +470,13 @@
         tr.className = "clickable";
         const statusClass = m.status === "active" ? "pill" : "pill inactive";
         tr.innerHTML =
-          `<td>${m.first_name} ${m.last_name}</td>` +
-          `<td>${m.email || "—"}</td>` +
-          `<td>${m.phone || "—"}</td>` +
-          `<td><span class="${statusClass}">${m.status}</span></td>` +
-          `<td>${nameOf(households, m.household_id)}</td>` +
-          `<td>${divisionNames(m.division_ids)}</td>` +
-          `<td>${tagNames(m.tag_ids)}</td>`;
+          `<td>${esc(m.first_name)} ${esc(m.last_name)}</td>` +
+          `<td>${esc(m.email || "—")}</td>` +
+          `<td>${esc(m.phone || "—")}</td>` +
+          `<td><span class="${statusClass}">${esc(m.status)}</span></td>` +
+          `<td>${esc(nameOf(households, m.household_id))}</td>` +
+          `<td>${esc(divisionNames(m.division_ids))}</td>` +
+          `<td>${esc(tagNames(m.tag_ids))}</td>`;
         tr.addEventListener("click", () => showProfile(m));
         tbody.appendChild(tr);
       }
@@ -518,7 +524,7 @@
       for (const m of allMembers) {
         const label = document.createElement("label");
         label.innerHTML =
-          `<input type="checkbox" value="${m.id}" /> ${m.first_name} ${m.last_name}`;
+          `<input type="checkbox" value="${m.id}" /> ${esc(m.first_name)} ${esc(m.last_name)}`;
         box.appendChild(label);
       }
       await loadByDivision();
@@ -545,7 +551,7 @@
           box.appendChild(line);
         }
       } catch (err) {
-        box.innerHTML = `<div class="hint">${err.message}</div>`;
+        box.innerHTML = `<div class="hint">${esc(err.message)}</div>`;
       }
     }
 
@@ -670,7 +676,7 @@
           const yesChecked = current === "yes" ? "checked" : "";
           const noChecked = current === "no" ? "checked" : "";
           row.innerHTML =
-            `${m.first_name} ${m.last_name} ` +
+            `${esc(m.first_name)} ${esc(m.last_name)} ` +
             `<label><input type="radio" name="rsvp-${m.id}" value="yes" ${yesChecked} /> yes</label> ` +
             `<label><input type="radio" name="rsvp-${m.id}" value="no" ${noChecked} /> no</label>`;
           row.querySelectorAll('input[type="radio"]').forEach((input) => {
@@ -679,7 +685,7 @@
           box.appendChild(row);
         }
       } catch (err) {
-        box.innerHTML = `<div class="hint">${err.message}</div>`;
+        box.innerHTML = `<div class="hint">${esc(err.message)}</div>`;
       }
     }
 
@@ -771,7 +777,7 @@
           box.appendChild(line);
         }
       } catch (err) {
-        box.innerHTML = `<div class="hint">${err.message}</div>`;
+        box.innerHTML = `<div class="hint">${esc(err.message)}</div>`;
       }
     }
 
@@ -1023,7 +1029,7 @@
           box.appendChild(line);
         }
       } catch (err) {
-        box.innerHTML = `<div class="hint">${err.message}</div>`;
+        box.innerHTML = `<div class="hint">${esc(err.message)}</div>`;
       }
     }
 
@@ -1108,14 +1114,14 @@
     function showProfile(m) {
       lastProfile = m;
       $("profile-body").innerHTML =
-        `<dt>Name</dt><dd>${m.first_name} ${m.last_name}</dd>` +
-        `<dt>Email</dt><dd>${m.email || "—"}</dd>` +
-        `<dt>Phone</dt><dd>${m.phone || "—"}</dd>` +
-        `<dt>Status</dt><dd>${m.status}</dd>` +
-        `<dt>Household</dt><dd>${nameOf(households, m.household_id)}</dd>` +
-        `<dt>Primary division</dt><dd>${nameOf(divisions, m.division_id)}</dd>` +
-        `<dt>Divisions</dt><dd>${divisionNames(m.division_ids)}</dd>` +
-        `<dt>Tags</dt><dd>${tagNames(m.tag_ids)}</dd>` +
+        `<dt>Name</dt><dd>${esc(m.first_name)} ${esc(m.last_name)}</dd>` +
+        `<dt>Email</dt><dd>${esc(m.email || "—")}</dd>` +
+        `<dt>Phone</dt><dd>${esc(m.phone || "—")}</dd>` +
+        `<dt>Status</dt><dd>${esc(m.status)}</dd>` +
+        `<dt>Household</dt><dd>${esc(nameOf(households, m.household_id))}</dd>` +
+        `<dt>Primary division</dt><dd>${esc(nameOf(divisions, m.division_id))}</dd>` +
+        `<dt>Divisions</dt><dd>${esc(divisionNames(m.division_ids))}</dd>` +
+        `<dt>Tags</dt><dd>${esc(tagNames(m.tag_ids))}</dd>` +
         `<dt>Attendance</dt><dd id="profile-attendance">…</dd>`;
       $("profile").hidden = false;
       refreshProfileHistory();

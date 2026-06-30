@@ -89,3 +89,4 @@ claude-opus-4-8[1m]
 ## Change Log
 
 - 2026-06-30: Implemented Story 3.1 (Record donations). Added the Giving Module foundation — `Donation` referencing shared member/household records, with a nullable `campaign_id` hook for Story 3.2. Endpoints for create/list and per-member/per-household history; a Giving UI card. 12 tests added (86 passing). Status → review.
+- 2026-06-30: Code review fixes — donation amount now rejects NaN/inf (a naive `<= 0` check let them through and they poisoned every aggregate); unknown `campaign_id` on a donation now returns 404 to match the pledge endpoint's treatment of the same missing-campaign condition. Regression tests added; the fundraising test asserting the old 400 was updated to 404.

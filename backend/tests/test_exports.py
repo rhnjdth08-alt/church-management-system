@@ -101,3 +101,12 @@ def test_fundraising_export_includes_campaign():
     ]
     data_row = next(r for r in rows[1:] if r[1] == "Build")
     assert float(data_row[4]) == 250.0  # total_raised
+
+
+def test_csv_formula_injection_is_neutralized():
+    """A campaign name beginning with a formula trigger is prefixed with ' so a
+    spreadsheet treats it as text, not an executable formula."""
+    client.post("/campaigns", json={"name": "=SUM(A1:A9)", "target_amount": 100.0})
+    rows = _rows(client.get("/exports/fundraising.csv").text)
+    name_cell = next(r[1] for r in rows[1:] if "SUM(A1:A9)" in r[1])
+    assert name_cell.startswith("'=")  # neutralized, not a live formula

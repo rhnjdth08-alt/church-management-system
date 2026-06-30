@@ -101,7 +101,9 @@ def test_contribution_via_donation_with_campaign_id():
     assert resp.json()["campaign_id"] == c["id"]
 
 
-def test_donation_unknown_campaign_400():
+def test_donation_unknown_campaign_404():
+    """An unknown campaign on a donation is 404 — consistent with the pledge
+    endpoint, which 404s the same missing-campaign condition."""
     m = _member()
     resp = client.post(
         "/donations",
@@ -113,7 +115,7 @@ def test_donation_unknown_campaign_400():
             "campaign_id": 9999,
         },
     )
-    assert resp.status_code == 400
+    assert resp.status_code == 404
 
 
 # --- AC #4: progress --------------------------------------------------------
@@ -147,6 +149,30 @@ def test_campaign_progress_math():
 
 def test_campaign_progress_invalid_404():
     assert client.get("/campaigns/9999/progress").status_code == 404
+
+
+def test_progress_zero_target_does_not_crash():
+    """A campaign row with target_amount == 0 (only reachable via direct DB
+    writes, since create_campaign rejects it) must not 500 the progress
+    endpoints — percent is reported as 0 instead of dividing by zero."""
+    from sqlmodel import Session
+
+    from app.database import engine
+    from app.models import FundraisingCampaign
+
+    with Session(engine) as session:
+        c = FundraisingCampaign(name="Legacy", target_amount=0.0)
+        session.add(c)
+        session.commit()
+        session.refresh(c)
+        cid = c.id
+
+    resp = client.get(f"/campaigns/{cid}/progress")
+    assert resp.status_code == 200
+    assert resp.json()["percent_raised"] == 0.0
+    # The all-campaigns fan-out and CSV export must also survive the 0-target row.
+    assert client.get("/giving/campaigns/progress").status_code == 200
+    assert client.get("/exports/fundraising.csv").status_code == 200
 
 
 def test_progress_remaining_not_negative_when_overfunded():

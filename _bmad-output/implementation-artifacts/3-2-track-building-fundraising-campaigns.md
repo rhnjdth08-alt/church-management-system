@@ -88,3 +88,4 @@ claude-opus-4-8[1m]
 ## Change Log
 
 - 2026-06-30: Implemented Story 3.2 (Track building fundraising campaigns). Added `FundraisingCampaign` + `Pledge`; contributions reuse `Donation.campaign_id`; progress endpoint reports target/pledged/raised/remaining/percent. Fundraising UI card. 11 tests added (97 passing). Status → review.
+- 2026-06-30: Code review fixes — (a) `_campaign_progress` guards divide-by-zero so a 0-target campaign row can't 500 the dashboard/all-campaigns/CSV endpoints; (b) campaign target and pledge amount now reject NaN/inf; (c) `create_campaign` target validation hardened. Regression test for the 0-target fan-out added. Note (by design, documented): `percent_raised` is driven by realized contributions (`Donation.campaign_id`), not pledges; pledges are reported separately as `total_pledged`.

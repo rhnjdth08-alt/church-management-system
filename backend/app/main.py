@@ -1,5 +1,6 @@
 import csv
 import io
+import math
 import re
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -639,7 +640,9 @@ def event_summary(*, session: Session = Depends(get_session), event_id: int):
 
 @app.post("/donations", response_model=DonationRead)
 def create_donation(*, session: Session = Depends(get_session), donation: DonationCreate):
-    if donation.amount <= 0:
+    # ``not > 0`` also rejects NaN (NaN comparisons are always False), so NaN/inf
+    # amounts can't slip in and poison every downstream giving aggregate.
+    if not (math.isfinite(donation.amount) and donation.amount > 0):
         raise HTTPException(status_code=400, detail="Donation amount must be positive.")
     if not donation.donation_type.strip():
         raise HTTPException(status_code=400, detail="Donation type is required.")
@@ -656,7 +659,9 @@ def create_donation(*, session: Session = Depends(get_session), donation: Donati
     if donation.campaign_id is not None and not session.get(
         FundraisingCampaign, donation.campaign_id
     ):
-        raise HTTPException(status_code=400, detail="Campaign not found.")
+        # 404 to match how the pledge endpoint treats a missing campaign — the
+        # same "campaign does not exist" condition gets one consistent status.
+        raise HTTPException(status_code=404, detail="Campaign not found.")
     db_donation = Donation.model_validate(donation)
     session.add(db_donation)
     session.commit()
@@ -696,7 +701,7 @@ def household_donations(*, session: Session = Depends(get_session), household_id
 def create_campaign(*, session: Session = Depends(get_session), campaign: CampaignCreate):
     if not campaign.name.strip():
         raise HTTPException(status_code=400, detail="Campaign name is required.")
-    if campaign.target_amount <= 0:
+    if not (math.isfinite(campaign.target_amount) and campaign.target_amount > 0):
         raise HTTPException(status_code=400, detail="Target amount must be positive.")
     db_campaign = FundraisingCampaign.model_validate(campaign)
     session.add(db_campaign)
@@ -716,7 +721,7 @@ def create_pledge(
 ):
     if not session.get(FundraisingCampaign, campaign_id):
         raise HTTPException(status_code=404, detail="Campaign not found.")
-    if pledge.amount <= 0:
+    if not (math.isfinite(pledge.amount) and pledge.amount > 0):
         raise HTTPException(status_code=400, detail="Pledge amount must be positive.")
     if pledge.member_id is not None and not session.get(Member, pledge.member_id):
         raise HTTPException(status_code=400, detail="Member not found.")
@@ -759,8 +764,11 @@ def _campaign_progress(session: Session, campaign: FundraisingCampaign) -> Campa
         ).all()
     )
     remaining = max(campaign.target_amount - total_raised, 0.0)
-    # target_amount is validated > 0 at creation, so this never divides by zero.
-    percent_raised = total_raised / campaign.target_amount * 100
+    # target_amount is validated > 0 at creation; guard anyway so a 0/legacy row
+    # can't 500 the fan-out endpoints (dashboard, all-campaigns, CSV export).
+    percent_raised = (
+        total_raised / campaign.target_amount * 100 if campaign.target_amount else 0.0
+    )
     return CampaignProgress(
         campaign_id=campaign.id,
         name=campaign.name,
@@ -959,12 +967,24 @@ def dashboard(*, session: Session = Depends(get_session)):
 # --- Exports (Epic 4, Story 4.3) -------------------------------------------
 
 
+def _csv_safe(value):
+    """Neutralize CSV formula injection in text cells.
+
+    A cell beginning with =, +, -, @ (or a tab/CR) is treated as a formula by
+    Excel/Sheets. User-controlled names (services, campaigns) could carry such a
+    payload, so prefix a single quote to force text on export.
+    """
+    if isinstance(value, str) and value[:1] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + value
+    return value
+
+
 def _csv_response(filename: str, header: list[str], rows: list[list]) -> Response:
     """Build a downloadable CSV response from a header + data rows (stdlib only)."""
     buffer = io.StringIO()
     writer = csv.writer(buffer)
     writer.writerow(header)
-    writer.writerows(rows)
+    writer.writerows([[_csv_safe(cell) for cell in row] for row in rows])
     return Response(
         content=buffer.getvalue(),
         media_type="text/csv",

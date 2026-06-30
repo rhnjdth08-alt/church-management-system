@@ -98,6 +98,26 @@ def test_reject_non_positive_amount():
     assert _donate(member_id=m, amount=-5).status_code == 400
 
 
+def test_reject_non_finite_amount():
+    """NaN/inf must be rejected — they bypass a naive ``<= 0`` check and would
+    poison every downstream giving aggregate. A spec-compliant JSON encoder
+    won't emit these, but a lax client can send the literals NaN/Infinity in a
+    raw body, so the API must guard regardless."""
+    m = _member()
+    for literal in ("NaN", "Infinity", "-Infinity"):
+        resp = client.post(
+            "/donations",
+            content=(
+                f'{{"amount": {literal}, "date": "2026-07-01", '
+                f'"donation_type": "t", "member_id": {m}}}'
+            ),
+            headers={"Content-Type": "application/json"},
+        )
+        # Either rejected by validation (400) or by the JSON parser (422) — never
+        # accepted (200).
+        assert resp.status_code in (400, 422)
+
+
 def test_reject_missing_donor():
     resp = _donate(amount=10.0)  # no member_id or household_id
     assert resp.status_code == 400

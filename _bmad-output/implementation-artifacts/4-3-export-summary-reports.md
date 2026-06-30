@@ -82,3 +82,4 @@ claude-opus-4-8[1m]
 ## Change Log
 
 - 2026-06-30: Implemented Story 4.3 (Export summary reports). Added CSV exports for attendance, giving, and fundraising — generated from existing summary helpers via the stdlib `csv` module (no new dependency). Download links in the Dashboard UI. 5 tests added (122 passing). Completes Epic 4 and the MVP backlog. Status → review.
+- 2026-06-30: Code review fix — `_csv_response` now neutralizes CSV formula injection (cells starting with `= + - @` / tab / CR are prefixed with `'`), so a service/campaign name like `=SUM(...)` can't execute when the export is opened in a spreadsheet. Regression test added.
