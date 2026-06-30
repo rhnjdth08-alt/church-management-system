@@ -141,6 +141,40 @@
         <div id="attendance-by-division" class="checklist"></div>
       </div>
 
+      <div class="card" id="events-panel">
+        <h2>Events &amp; RSVPs</h2>
+        <div class="row">
+          <div>
+            <label for="event-name">Event *</label>
+            <input id="event-name" placeholder="Church Picnic" />
+          </div>
+          <div>
+            <label for="event-date">Date *</label>
+            <input id="event-date" type="date" />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label for="event-location">Location</label>
+            <input id="event-location" placeholder="City Park" />
+          </div>
+          <div>
+            <label for="event-description">Description</label>
+            <input id="event-description" placeholder="Annual gathering" />
+          </div>
+        </div>
+        <div class="actions">
+          <button type="button" class="ghost" id="create-event">Create event</button>
+        </div>
+
+        <label for="rsvp-event">Event to RSVP for</label>
+        <select id="rsvp-event"></select>
+        <div id="rsvp-summary" class="hint"></div>
+        <label>RSVP members</label>
+        <div id="rsvp-members" class="checklist"></div>
+        <div class="msg" id="event-msg"></div>
+      </div>
+
       <div class="card">
         <h2>Directory</h2>
         <div class="filters">
@@ -173,6 +207,7 @@
     let tags = [];
     let services = [];
     let allMembers = [];
+    let events = [];
     let lastProfile = null;
 
     async function api(path, opts) {
@@ -440,6 +475,124 @@
       }
     }
 
+    // --- Events & RSVPs (Story 2.3) ---
+    function setEventMsg(text, ok) {
+      const el = $("event-msg");
+      el.textContent = text || "";
+      el.className = "msg" + (text ? (ok ? " ok" : " error") : "");
+    }
+
+    async function loadEvents() {
+      [events, allMembers] = await Promise.all([api("/events"), api("/members")]);
+      const sel = $("rsvp-event");
+      const current = sel.value;
+      sel.innerHTML = "";
+      if (!events.length) {
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = "— create an event first —";
+        sel.appendChild(opt);
+      }
+      for (const e of events) {
+        const opt = document.createElement("option");
+        opt.value = e.id;
+        opt.textContent = `${e.name} (${e.date})`;
+        sel.appendChild(opt);
+      }
+      sel.value = current;
+      if (sel.selectedIndex < 0 && sel.options.length) sel.selectedIndex = 0;
+      await loadRsvps();
+    }
+
+    async function loadRsvps() {
+      const box = $("rsvp-members");
+      const eventId = $("rsvp-event").value;
+      box.innerHTML = "";
+      $("rsvp-summary").textContent = "";
+      if (!eventId) {
+        box.innerHTML = '<div class="hint">Select an event to RSVP.</div>';
+        return;
+      }
+      if (!allMembers.length) {
+        box.innerHTML = '<div class="hint">No members yet — add some first.</div>';
+        return;
+      }
+      try {
+        const [rsvps, summary] = await Promise.all([
+          api(`/events/${eventId}/rsvps`),
+          api(`/events/${eventId}/summary`),
+        ]);
+        const responseByMember = {};
+        for (const r of rsvps) responseByMember[r.member_id] = r.response;
+        $("rsvp-summary").textContent =
+          `Attending: ${summary.yes_count} · Not attending: ${summary.no_count} · Total responded: ${summary.total}`;
+        for (const m of allMembers) {
+          const current = responseByMember[m.id] || "";
+          const row = document.createElement("div");
+          const yesChecked = current === "yes" ? "checked" : "";
+          const noChecked = current === "no" ? "checked" : "";
+          row.innerHTML =
+            `${m.first_name} ${m.last_name} ` +
+            `<label><input type="radio" name="rsvp-${m.id}" value="yes" ${yesChecked} /> yes</label> ` +
+            `<label><input type="radio" name="rsvp-${m.id}" value="no" ${noChecked} /> no</label>`;
+          row.querySelectorAll('input[type="radio"]').forEach((input) => {
+            input.addEventListener("change", () => sendRsvp(m.id, input.value));
+          });
+          box.appendChild(row);
+        }
+      } catch (err) {
+        box.innerHTML = `<div class="hint">${err.message}</div>`;
+      }
+    }
+
+    async function sendRsvp(memberId, response) {
+      const eventId = $("rsvp-event").value;
+      if (!eventId) return;
+      try {
+        const summary = await api(`/events/${eventId}/rsvps`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ member_id: Number(memberId), response }),
+        });
+        $("rsvp-summary").textContent =
+          `Attending: ${summary.yes_count} · Not attending: ${summary.no_count} · Total responded: ${summary.total}`;
+        setEventMsg("RSVP saved.", true);
+      } catch (err) {
+        setEventMsg(err.message, false);
+      }
+    }
+
+    async function createEvent() {
+      const name = $("event-name").value.trim();
+      const date = $("event-date").value;
+      if (!name || !date) {
+        setEventMsg("Event name and date are required.", false);
+        return;
+      }
+      try {
+        const ev = await api("/events", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name,
+            date,
+            location: $("event-location").value.trim() || null,
+            description: $("event-description").value.trim() || null,
+          }),
+        });
+        $("event-name").value = "";
+        $("event-date").value = "";
+        $("event-location").value = "";
+        $("event-description").value = "";
+        await loadEvents();
+        $("rsvp-event").value = ev.id;
+        await loadRsvps();
+        setEventMsg(`Event "${ev.name}" created.`, true);
+      } catch (err) {
+        setEventMsg(err.message, false);
+      }
+    }
+
     function showProfile(m) {
       lastProfile = m;
       $("profile-body").innerHTML =
@@ -565,6 +718,10 @@
     $("attendance-service").addEventListener("change", () =>
       loadByDivision().catch((e) => setAttMsg(e.message, false))
     );
+    $("create-event").addEventListener("click", createEvent);
+    $("rsvp-event").addEventListener("change", () =>
+      loadRsvps().catch((e) => setEventMsg(e.message, false))
+    );
 
     // --- Directory search & filtering ---
     let searchTimer = null;
@@ -594,6 +751,7 @@
         await loadLookups();
         await loadDirectory();
         await loadAttendance();
+        await loadEvents();
       } catch (err) {
         $("dir-msg").textContent = err.message;
         $("dir-msg").className = "msg error";

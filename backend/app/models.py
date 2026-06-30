@@ -167,3 +167,39 @@ class AttendanceRecord(SQLModel, table=True):
     date: date
 
     service: Optional[Service] = Relationship(back_populates="attendance")
+
+
+# --- Events & RSVPs (Epic 2, Story 2.3) ------------------------------------
+
+
+class EventBase(SQLModel):
+    name: str
+    # ISO date string of the event (e.g. "2026-08-01").
+    date: date
+    location: Optional[str] = None
+    description: Optional[str] = None
+
+
+class Event(EventBase, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    rsvps: List["EventRSVP"] = Relationship(back_populates="event")
+
+
+class EventRSVP(SQLModel, table=True):
+    """One member's RSVP to one event.
+
+    A unique (member_id, event_id) pair keeps RSVPing idempotent — re-RSVPing
+    updates the existing ``response`` rather than inserting a duplicate.
+    ``response`` is "yes" or "no".
+    """
+
+    __table_args__ = (
+        UniqueConstraint("member_id", "event_id", name="uq_rsvp_member_event"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    member_id: int = Field(foreign_key="member.id")
+    event_id: int = Field(foreign_key="event.id")
+    response: str
+
+    event: Optional[Event] = Relationship(back_populates="rsvps")

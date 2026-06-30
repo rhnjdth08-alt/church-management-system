@@ -107,3 +107,40 @@ class DivisionAttendanceSummaryEntry(SQLModel):
     name: str
     date: date
     present: int
+
+
+# --- Events & RSVPs (Story 2.3) --------------------------------------------
+
+
+class EventCreate(SQLModel):
+    name: str
+    date: date
+    location: Optional[str] = None
+    description: Optional[str] = None
+
+
+class EventRead(SQLModel):
+    id: int
+    name: str
+    date: date
+    location: Optional[str] = None
+    description: Optional[str] = None
+
+
+class RSVPCreate(SQLModel):
+    member_id: int
+    response: str
+
+
+class RSVPRead(SQLModel):
+    member_id: int
+    response: str
+
+
+class EventRSVPSummary(SQLModel):
+    """Attendee-count breakdown for an event (Story 2.3, AC #4)."""
+
+    event_id: int
+    yes_count: int
+    no_count: int
+    total: int

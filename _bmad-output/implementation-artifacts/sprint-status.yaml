@@ -16,6 +16,21 @@ epics:
     stories:
       - 2-1-record-attendance-for-services
       - 2-2-track-attendance-by-division
+      - 2-3-manage-event-rsvps
+  - id: epic-3
+    title: Giving and Stewardship
+    status: in-progress
+    stories:
+      - 3-1-record-donations
+      - 3-2-track-building-fundraising-campaigns
+      - 3-3-review-giving-summaries
+  - id: epic-4
+    title: Communication and Reporting
+    status: in-progress
+    stories:
+      - 4-1-send-targeted-announcements
+      - 4-2-provide-basic-dashboards
+      - 4-3-export-summary-reports
 
 development_status:
   1-1-create-and-update-member-records:
@@ -48,3 +63,45 @@ development_status:
     epic: 2
     story: 2
     file: _bmad-output/implementation-artifacts/2-2-track-attendance-by-division.md
+  2-3-manage-event-rsvps:
+    status: review
+    title: Manage event RSVPs
+    epic: 2
+    story: 3
+    file: _bmad-output/implementation-artifacts/2-3-manage-event-rsvps.md
+  3-1-record-donations:
+    status: ready-for-dev
+    title: Record donations
+    epic: 3
+    story: 1
+    file: _bmad-output/implementation-artifacts/3-1-record-donations.md
+  3-2-track-building-fundraising-campaigns:
+    status: ready-for-dev
+    title: Track building fundraising campaigns
+    epic: 3
+    story: 2
+    file: _bmad-output/implementation-artifacts/3-2-track-building-fundraising-campaigns.md
+  3-3-review-giving-summaries:
+    status: ready-for-dev
+    title: Review giving summaries
+    epic: 3
+    story: 3
+    file: _bmad-output/implementation-artifacts/3-3-review-giving-summaries.md
+  4-1-send-targeted-announcements:
+    status: ready-for-dev
+    title: Send targeted announcements
+    epic: 4
+    story: 1
+    file: _bmad-output/implementation-artifacts/4-1-send-targeted-announcements.md
+  4-2-provide-basic-dashboards:
+    status: ready-for-dev
+    title: Provide basic dashboards
+    epic: 4
+    story: 2
+    file: _bmad-output/implementation-artifacts/4-2-provide-basic-dashboards.md
+  4-3-export-summary-reports:
+    status: ready-for-dev
+    title: Export summary reports
+    epic: 4
+    story: 3
+    file: _bmad-output/implementation-artifacts/4-3-export-summary-reports.md

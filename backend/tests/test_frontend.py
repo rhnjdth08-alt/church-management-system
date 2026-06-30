@@ -52,3 +52,11 @@ def test_attendance_by_division_breakdown_present():
     """The UI must show a per-division attendance breakdown (Story 2.2)."""
     body = client.get("/").text
     assert 'id="attendance-by-division"' in body
+
+
+def test_events_ui_controls_present():
+    """The UI must let a coordinator create an event and RSVP members (Story 2.3)."""
+    body = client.get("/").text
+    assert 'id="events-panel"' in body
+    assert 'id="event-name"' in body
+    assert 'id="event-date"' in body

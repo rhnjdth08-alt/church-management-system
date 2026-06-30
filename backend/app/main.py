@@ -12,6 +12,8 @@ from .database import create_db_and_tables, engine, get_session
 from .models import (
     AttendanceRecord,
     Division,
+    Event,
+    EventRSVP,
     Household,
     Member,
     MemberDivisionLink,
@@ -25,10 +27,15 @@ from .schemas import (
     DivisionAttendanceCount,
     DivisionAttendanceSummaryEntry,
     DivisionCreate,
+    EventCreate,
+    EventRead,
+    EventRSVPSummary,
     HouseholdCreate,
     MemberCreate,
     MemberRead,
     MemberUpdate,
+    RSVPCreate,
+    RSVPRead,
     ServiceCreate,
     ServiceRead,
     TagCreate,
@@ -499,6 +506,93 @@ def division_attendance_summary(
             )
         )
     return summary
+
+
+# --- Events & RSVPs (Epic 2, Story 2.3) ------------------------------------
+
+# Allowed RSVP responses (AC #2).
+_RSVP_RESPONSES = {"yes", "no"}
+
+
+def _event_summary(session: Session, event_id: int) -> EventRSVPSummary:
+    """Yes/no/total RSVP counts for an event (AC #4)."""
+    rsvps = session.exec(
+        select(EventRSVP).where(EventRSVP.event_id == event_id)
+    ).all()
+    yes_count = sum(1 for r in rsvps if r.response == "yes")
+    no_count = sum(1 for r in rsvps if r.response == "no")
+    return EventRSVPSummary(
+        event_id=event_id,
+        yes_count=yes_count,
+        no_count=no_count,
+        total=len(rsvps),
+    )
+
+
+@app.post("/events", response_model=EventRead)
+def create_event(*, session: Session = Depends(get_session), event: EventCreate):
+    db_event = Event.model_validate(event)
+    session.add(db_event)
+    session.commit()
+    session.refresh(db_event)
+    return db_event
+
+
+@app.get("/events", response_model=list[EventRead])
+def list_events(*, session: Session = Depends(get_session)):
+    return session.exec(select(Event)).all()
+
+
+@app.post("/events/{event_id}/rsvps", response_model=EventRSVPSummary)
+def create_or_update_rsvp(
+    *, session: Session = Depends(get_session), event_id: int, rsvp: RSVPCreate
+):
+    """Record or update a member's RSVP to an event (AC #2, #3).
+
+    Idempotent per (member, event): re-RSVPing updates the existing response
+    rather than inserting a duplicate. Returns the event's attendee summary.
+    """
+    if not session.get(Event, event_id):
+        raise HTTPException(status_code=404, detail="Event not found.")
+    if not session.get(Member, rsvp.member_id):
+        raise HTTPException(status_code=400, detail="Member not found.")
+    if rsvp.response not in _RSVP_RESPONSES:
+        raise HTTPException(status_code=400, detail="Response must be 'yes' or 'no'.")
+    existing = session.exec(
+        select(EventRSVP)
+        .where(EventRSVP.event_id == event_id)
+        .where(EventRSVP.member_id == rsvp.member_id)
+    ).first()
+    if existing:
+        existing.response = rsvp.response
+        session.add(existing)
+    else:
+        session.add(
+            EventRSVP(
+                event_id=event_id, member_id=rsvp.member_id, response=rsvp.response
+            )
+        )
+    session.commit()
+    return _event_summary(session, event_id)
+
+
+@app.get("/events/{event_id}/rsvps", response_model=list[RSVPRead])
+def list_event_rsvps(*, session: Session = Depends(get_session), event_id: int):
+    """All RSVPs recorded for an event (AC #4)."""
+    if not session.get(Event, event_id):
+        raise HTTPException(status_code=404, detail="Event not found.")
+    rsvps = session.exec(
+        select(EventRSVP).where(EventRSVP.event_id == event_id)
+    ).all()
+    return [RSVPRead(member_id=r.member_id, response=r.response) for r in rsvps]
+
+
+@app.get("/events/{event_id}/summary", response_model=EventRSVPSummary)
+def event_summary(*, session: Session = Depends(get_session), event_id: int):
+    """Attendee-count summary for an event (AC #4)."""
+    if not session.get(Event, event_id):
+        raise HTTPException(status_code=404, detail="Event not found.")
+    return _event_summary(session, event_id)
 
 
 @app.get("/", include_in_schema=False)
