@@ -88,7 +88,7 @@ development_status:
     story: 3
     file: _bmad-output/implementation-artifacts/3-3-review-giving-summaries.md
   4-1-send-targeted-announcements:
-    status: ready-for-dev
+    status: review
     title: Send targeted announcements
     epic: 4
     story: 1

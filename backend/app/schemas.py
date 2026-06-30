@@ -231,3 +231,32 @@ class GivingSummary(SQLModel):
     grand_total: float
     by_period: List[GivingByPeriod] = []
     by_donor: List[GivingByDonor] = []
+
+
+# --- Communications (Story 4.1) --------------------------------------------
+
+
+class AnnouncementCreate(SQLModel):
+    subject: str
+    body: str
+    date: date
+    tag_id: Optional[int] = None
+    division_id: Optional[int] = None
+    household_id: Optional[int] = None
+    status: Optional[str] = None
+
+
+class AnnouncementRead(SQLModel):
+    id: int
+    subject: str
+    body: str
+    date: date
+    recipient_count: int
+    tag_id: Optional[int] = None
+    division_id: Optional[int] = None
+    household_id: Optional[int] = None
+    status: Optional[str] = None
+
+
+class RecipientCount(SQLModel):
+    recipient_count: int

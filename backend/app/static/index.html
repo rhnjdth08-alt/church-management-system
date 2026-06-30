@@ -261,6 +261,37 @@
         <div class="msg" id="summary-msg"></div>
       </div>
 
+      <div class="card" id="announcements-panel">
+        <h2>Announcements</h2>
+        <label for="announcement-subject">Subject *</label>
+        <input id="announcement-subject" placeholder="Service time change" />
+        <label for="announcement-body">Message *</label>
+        <input id="announcement-body" placeholder="This Sunday we meet at 10am." />
+        <div class="row">
+          <div>
+            <label for="announcement-division">Division</label>
+            <select id="announcement-division"></select>
+          </div>
+          <div>
+            <label for="announcement-tag">Tag</label>
+            <select id="announcement-tag"></select>
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label for="announcement-household">Household</label>
+            <select id="announcement-household"></select>
+          </div>
+        </div>
+        <div id="announcement-preview" class="hint"></div>
+        <div class="actions">
+          <button type="button" class="primary" id="send-announcement">Send announcement</button>
+        </div>
+        <div class="msg" id="announcement-msg"></div>
+        <label>Sent log</label>
+        <div id="announcement-log" class="checklist"></div>
+      </div>
+
       <div class="card">
         <h2>Directory</h2>
         <div class="filters">
@@ -920,6 +951,93 @@
       }
     }
 
+    // --- Announcements (Story 4.1) ---
+    function setAnnMsg(text, ok) {
+      const el = $("announcement-msg");
+      el.textContent = text || "";
+      el.className = "msg" + (text ? (ok ? " ok" : " error") : "");
+    }
+
+    function announcementFilters() {
+      const params = new URLSearchParams();
+      const div = $("announcement-division").value;
+      const tag = $("announcement-tag").value;
+      const hh = $("announcement-household").value;
+      if (div) params.set("division_id", div);
+      if (tag) params.set("tag_id", tag);
+      if (hh) params.set("household_id", hh);
+      return params;
+    }
+
+    async function loadAnnouncements() {
+      fillSelect($("announcement-division"), divisions);
+      fillSelect($("announcement-tag"), tags);
+      fillSelect($("announcement-household"), households);
+      await Promise.all([previewAudience(), refreshAnnouncementLog()]);
+    }
+
+    async function previewAudience() {
+      try {
+        const params = announcementFilters();
+        const res = await api(`/announcements/preview?${params.toString()}`);
+        $("announcement-preview").textContent =
+          `Will reach ${res.recipient_count} member(s).`;
+      } catch (err) {
+        $("announcement-preview").textContent = err.message;
+      }
+    }
+
+    async function refreshAnnouncementLog() {
+      const box = $("announcement-log");
+      box.innerHTML = "";
+      try {
+        const log = await api("/announcements");
+        if (!log.length) {
+          box.innerHTML = '<div class="hint">No announcements sent yet.</div>';
+          return;
+        }
+        for (const a of log) {
+          const line = document.createElement("div");
+          line.textContent = `${a.date} · ${a.subject} → ${a.recipient_count} recipient(s)`;
+          box.appendChild(line);
+        }
+      } catch (err) {
+        box.innerHTML = `<div class="hint">${err.message}</div>`;
+      }
+    }
+
+    async function sendAnnouncement() {
+      const subject = $("announcement-subject").value.trim();
+      const body = $("announcement-body").value.trim();
+      if (!subject || !body) {
+        setAnnMsg("Subject and message are required.", false);
+        return;
+      }
+      const div = $("announcement-division").value;
+      const tag = $("announcement-tag").value;
+      const hh = $("announcement-household").value;
+      try {
+        const sent = await api("/announcements", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            subject,
+            body,
+            date: new Date().toISOString().slice(0, 10),
+            division_id: div ? Number(div) : null,
+            tag_id: tag ? Number(tag) : null,
+            household_id: hh ? Number(hh) : null,
+          }),
+        });
+        $("announcement-subject").value = "";
+        $("announcement-body").value = "";
+        await refreshAnnouncementLog();
+        setAnnMsg(`Sent to ${sent.recipient_count} member(s).`, true);
+      } catch (err) {
+        setAnnMsg(err.message, false);
+      }
+    }
+
     function showProfile(m) {
       lastProfile = m;
       $("profile-body").innerHTML =
@@ -1056,6 +1174,12 @@
       loadProgress().catch((e) => setFundMsg(e.message, false))
     );
     $("refresh-summary").addEventListener("click", loadSummary);
+    $("send-announcement").addEventListener("click", sendAnnouncement);
+    ["announcement-division", "announcement-tag", "announcement-household"].forEach((id) => {
+      $(id).addEventListener("change", () =>
+        previewAudience().catch((e) => setAnnMsg(e.message, false))
+      );
+    });
 
     // --- Directory search & filtering ---
     let searchTimer = null;
@@ -1089,6 +1213,7 @@
         await loadGiving();
         await loadFundraising();
         await loadSummary();
+        await loadAnnouncements();
       } catch (err) {
         $("dir-msg").textContent = err.message;
         $("dir-msg").className = "msg error";

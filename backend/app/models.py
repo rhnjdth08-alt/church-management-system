@@ -249,3 +249,25 @@ class Pledge(SQLModel, table=True):
     household_id: Optional[int] = Field(default=None, foreign_key="household.id")
 
     campaign: Optional[FundraisingCampaign] = Relationship(back_populates="pledges")
+
+
+# --- Communications (Epic 4, Story 4.1) ------------------------------------
+
+
+class Announcement(SQLModel, table=True):
+    """A logged announcement (Story 4.1).
+
+    There is no external transport in this stack — "sending" records the message
+    and the resolved recipient count. The audience filter fields mirror the
+    member directory filters (Story 1.3).
+    """
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    subject: str
+    body: str
+    date: date
+    recipient_count: int = 0
+    tag_id: Optional[int] = Field(default=None, foreign_key="tag.id")
+    division_id: Optional[int] = Field(default=None, foreign_key="division.id")
+    household_id: Optional[int] = Field(default=None, foreign_key="household.id")
+    status: Optional[str] = None

@@ -82,3 +82,11 @@ def test_giving_summary_ui_present():
     """The UI must surface a giving summary (Story 3.3)."""
     body = client.get("/").text
     assert 'id="summary-panel"' in body
+
+
+def test_announcements_ui_present():
+    """The UI must let staff compose announcements (Story 4.1)."""
+    body = client.get("/").text
+    assert 'id="announcements-panel"' in body
+    assert 'id="announcement-subject"' in body
+    assert 'id="announcement-body"' in body

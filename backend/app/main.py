@@ -10,6 +10,7 @@ from sqlmodel import Session, func, select
 
 from .database import create_db_and_tables, engine, get_session
 from .models import (
+    Announcement,
     AttendanceRecord,
     Division,
     Donation,
@@ -25,6 +26,8 @@ from .models import (
     Tag,
 )
 from .schemas import (
+    AnnouncementCreate,
+    AnnouncementRead,
     AttendanceCreate,
     AttendanceHistoryEntry,
     CampaignCreate,
@@ -47,6 +50,7 @@ from .schemas import (
     MemberUpdate,
     PledgeCreate,
     PledgeRead,
+    RecipientCount,
     RSVPCreate,
     RSVPRead,
     ServiceCreate,
@@ -295,20 +299,19 @@ def update_member(*, session: Session = Depends(get_session), member_id: int, me
     return _to_read(db_member)
 
 
-@app.get("/members", response_model=list[MemberRead])
-def list_members(
+def _filter_members(
+    session: Session,
     *,
-    session: Session = Depends(get_session),
-    q: Optional[str] = Query(default=None),
-    household_id: Optional[int] = Query(default=None),
-    status: Optional[str] = Query(default=None),
-    division_id: Optional[int] = Query(default=None),
-    tag_id: Optional[int] = Query(default=None),
-):
-    """List members, optionally narrowed by search and filters (Story 1.3).
+    q: Optional[str] = None,
+    household_id: Optional[int] = None,
+    status: Optional[str] = None,
+    division_id: Optional[int] = None,
+    tag_id: Optional[int] = None,
+) -> list[Member]:
+    """Resolve members matching optional search + filters (Story 1.3).
 
-    All parameters are optional and combine with AND semantics. With no
-    parameters this returns every member (preserving the original behavior).
+    Parameters combine with AND semantics; no parameters returns every member.
+    Shared by the directory endpoint and announcement audience resolution (4.1).
     """
     statement = select(Member)
     if q:
@@ -324,16 +327,35 @@ def list_members(
     if status is not None:
         statement = statement.where(Member.status == status)
     if division_id is not None:
-        # Members assigned to the division via the link table (AC #4).
         statement = statement.join(
             MemberDivisionLink, MemberDivisionLink.member_id == Member.id
         ).where(MemberDivisionLink.division_id == division_id)
     if tag_id is not None:
-        # Members assigned the ministry tag via its link table (AC #5).
         statement = statement.join(
             MemberTagLink, MemberTagLink.member_id == Member.id
         ).where(MemberTagLink.tag_id == tag_id)
-    members = session.exec(statement).all()
+    return session.exec(statement).all()
+
+
+@app.get("/members", response_model=list[MemberRead])
+def list_members(
+    *,
+    session: Session = Depends(get_session),
+    q: Optional[str] = Query(default=None),
+    household_id: Optional[int] = Query(default=None),
+    status: Optional[str] = Query(default=None),
+    division_id: Optional[int] = Query(default=None),
+    tag_id: Optional[int] = Query(default=None),
+):
+    """List members, optionally narrowed by search and filters (Story 1.3)."""
+    members = _filter_members(
+        session,
+        q=q,
+        household_id=household_id,
+        status=status,
+        division_id=division_id,
+        tag_id=tag_id,
+    )
     return [_to_read(m) for m in members]
 
 
@@ -797,6 +819,97 @@ def all_campaigns_progress(*, session: Session = Depends(get_session)):
     """Progress for every fundraising campaign, shown alongside giving (AC #3)."""
     campaigns = session.exec(select(FundraisingCampaign)).all()
     return [_campaign_progress(session, c) for c in campaigns]
+
+
+# --- Communications (Epic 4, Story 4.1) ------------------------------------
+
+
+def _resolve_audience_count(
+    session: Session,
+    *,
+    tag_id: Optional[int],
+    division_id: Optional[int],
+    household_id: Optional[int],
+    status: Optional[str],
+) -> int:
+    """Number of members matching an announcement's audience filters (AC #2, #4).
+
+    Reuses the shared member-filtering logic so audience semantics match the
+    directory exactly (AND of filters; no filters = all members).
+    """
+    return len(
+        _filter_members(
+            session,
+            household_id=household_id,
+            status=status,
+            division_id=division_id,
+            tag_id=tag_id,
+        )
+    )
+
+
+@app.post("/announcements", response_model=AnnouncementRead)
+def send_announcement(
+    *, session: Session = Depends(get_session), announcement: AnnouncementCreate
+):
+    """Compose and "send" an announcement (AC #1-#5).
+
+    No external transport exists: this records the message and the resolved
+    recipient count. The audience is resolved from the shared member directory.
+    """
+    if not announcement.subject.strip():
+        raise HTTPException(status_code=400, detail="Subject is required.")
+    if not announcement.body.strip():
+        raise HTTPException(status_code=400, detail="Body is required.")
+    recipient_count = _resolve_audience_count(
+        session,
+        tag_id=announcement.tag_id,
+        division_id=announcement.division_id,
+        household_id=announcement.household_id,
+        status=announcement.status,
+    )
+    db_announcement = Announcement(
+        subject=announcement.subject,
+        body=announcement.body,
+        date=announcement.date,
+        recipient_count=recipient_count,
+        tag_id=announcement.tag_id,
+        division_id=announcement.division_id,
+        household_id=announcement.household_id,
+        status=announcement.status,
+    )
+    session.add(db_announcement)
+    session.commit()
+    session.refresh(db_announcement)
+    return db_announcement
+
+
+@app.get("/announcements", response_model=list[AnnouncementRead])
+def list_announcements(*, session: Session = Depends(get_session)):
+    """Sent announcement log, most recent first (AC #3)."""
+    announcements = session.exec(select(Announcement)).all()
+    return sorted(announcements, key=lambda a: a.id or 0, reverse=True)
+
+
+@app.get("/announcements/preview", response_model=RecipientCount)
+def preview_announcement_audience(
+    *,
+    session: Session = Depends(get_session),
+    tag_id: Optional[int] = Query(default=None),
+    division_id: Optional[int] = Query(default=None),
+    household_id: Optional[int] = Query(default=None),
+    status: Optional[str] = Query(default=None),
+):
+    """Resolve the recipient count for a filter set without logging (AC #6)."""
+    return RecipientCount(
+        recipient_count=_resolve_audience_count(
+            session,
+            tag_id=tag_id,
+            division_id=division_id,
+            household_id=household_id,
+            status=status,
+        )
+    )
 
 
 @app.get("/", include_in_schema=False)
